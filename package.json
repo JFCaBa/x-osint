@@ -1,0 +1,5 @@
+{
+  "name": "x-osint",
+  "private": true,
+  "workspaces": ["packages/api", "packages/www"]
+}
