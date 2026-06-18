@@ -1,0 +1,16 @@
+services:
+  x-osint:
+    build: .
+    image: x-osint
+    ports:
+      - "8080:8080"
+    environment:
+      X_OSINT_PASSWORD: "${X_OSINT_PASSWORD:-changeme}"
+      POLL_INTERVAL_MIN: "5"
+      RETENTION_DAYS: "30"
+    volumes:
+      - x-data:/data
+    restart: unless-stopped
+
+volumes:
+  x-data:
