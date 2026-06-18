@@ -37,4 +37,9 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ X_OSINT_PASSWORD: 'pw', NITTER_INSTANCES: 'not json' }))
       .toThrow(/NITTER_INSTANCES/);
   });
+
+  it('throws on schema-invalid NITTER_INSTANCES', () => {
+    expect(() => loadConfig({ X_OSINT_PASSWORD: 'pw', NITTER_INSTANCES: '[{"url":"bad","userAgent":""}]' }))
+      .toThrow(/NITTER_INSTANCES/);
+  });
 });
