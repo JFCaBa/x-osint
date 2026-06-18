@@ -62,11 +62,13 @@ export function createRoutes(config: Config, repo: Repo, triggerFetch: () => voi
 
   router.get('/posts', auth, (req: Request, res: Response) => {
     const q = req.query;
+    const rawLimit = typeof q.limit === 'string' ? Number(q.limit) : undefined;
+    const limit = rawLimit !== undefined && Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
     res.json(repo.listPosts({
       handle: typeof q.handle === 'string' ? normalizeHandle(q.handle) : undefined,
       q: typeof q.q === 'string' ? q.q : undefined,
       since: typeof q.since === 'string' ? q.since : undefined,
-      limit: typeof q.limit === 'string' ? Number(q.limit) : undefined,
+      limit,
     }));
   });
 
