@@ -34,8 +34,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   if (!res.ok) {
     if (res.status === 401) {
       token = null;
-      localStorage.removeItem('x-osint-token');
-      if (window.location.pathname !== '/login') window.location.assign('/login');
+      if (typeof localStorage !== 'undefined') localStorage.removeItem('x-osint-token');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
     }
     const msg = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(res.status, (msg as { error?: string }).error ?? 'request failed');
