@@ -11,6 +11,7 @@ export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: Ht
   const httpGet = deps.httpGet ?? httpsGet;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let pruneTimer: ReturnType<typeof setInterval> | null = null;
+  let initTimer: ReturnType<typeof setTimeout> | null = null;
   let running = false;
 
   async function pollOnce(): Promise<void> {
@@ -35,7 +36,7 @@ export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: Ht
 
   return {
     start(): void {
-      setTimeout(() => { void pollOnce(); }, 2000);
+      initTimer = setTimeout(() => { void pollOnce(); }, 2000);
       pollTimer = setInterval(() => { void pollOnce(); }, config.pollIntervalMin * 60_000);
       pruneTimer = setInterval(() => {
         try {
@@ -47,8 +48,10 @@ export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: Ht
       }, 6 * 60 * 60_000);
     },
     stop(): void {
+      if (initTimer) clearTimeout(initTimer);
       if (pollTimer) clearInterval(pollTimer);
       if (pruneTimer) clearInterval(pruneTimer);
+      initTimer = null;
       pollTimer = null;
       pruneTimer = null;
     },
