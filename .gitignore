@@ -3,3 +3,5 @@ dist/
 *.log
 data/
 .DS_Store
+.npm-cache/
+**/.npm-cache/
