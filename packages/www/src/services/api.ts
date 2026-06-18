@@ -1,0 +1,65 @@
+export interface Account {
+  handle: string;
+  display_name: string | null;
+  enabled: boolean;
+  added_at: string;
+  last_fetched_at: string | null;
+  last_status: 'ok' | 'error' | null;
+}
+export interface Post {
+  id: string;
+  handle: string;
+  text: string;
+  url: string | null;
+  media_url: string | null;
+  posted_at: string;
+  fetched_at: string;
+}
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
+
+let token: string | null = null;
+
+async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ error: res.statusText }));
+    throw new ApiError(res.status, (msg as { error?: string }).error ?? 'request failed');
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  setToken(t: string | null): void { token = t; },
+  async login(password: string): Promise<string> {
+    const r = await call<{ token: string }>('POST', '/login', { password });
+    return r.token;
+  },
+  listAccounts(): Promise<Account[]> { return call<Account[]>('GET', '/accounts'); },
+  addAccount(handle: string): Promise<Account> { return call<Account>('POST', '/accounts', { handle }); },
+  setEnabled(handle: string, enabled: boolean): Promise<Account> {
+    return call<Account>('PATCH', `/accounts/${encodeURIComponent(handle)}`, { enabled });
+  },
+  removeAccount(handle: string): Promise<void> {
+    return call<void>('DELETE', `/accounts/${encodeURIComponent(handle)}`);
+  },
+  listPosts(params: { handle?: string; q?: string; limit?: number }): Promise<Post[]> {
+    const qs = new URLSearchParams();
+    if (params.handle) qs.set('handle', params.handle);
+    if (params.q) qs.set('q', params.q);
+    if (params.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return call<Post[]>('GET', `/posts${suffix}`);
+  },
+  triggerFetch(): Promise<void> { return call<void>('POST', '/fetch'); },
+};
