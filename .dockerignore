@@ -3,3 +3,4 @@
 .git
 data
 *.log
+**/.npm-cache

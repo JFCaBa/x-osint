@@ -3,7 +3,7 @@ FROM node:22-slim AS www-build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY packages/www/package.json packages/www/package.json
-RUN npm install --workspace @x-osint/www --include-workspace-root=false || npm install
+RUN npm install --workspace @x-osint/www || npm install
 COPY packages/www packages/www
 RUN npm run build --workspace @x-osint/www
 
@@ -13,7 +13,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 COPY packages/api/package.json packages/api/package.json
-RUN npm install --workspace @x-osint/api --include-workspace-root=false || npm install
+RUN npm install --workspace @x-osint/api || npm install
 COPY packages/api packages/api
 RUN npm run build --workspace @x-osint/api
 
@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y python3 make g++ && \
 COPY --from=api-build /app/packages/api/dist ./dist
 COPY --from=www-build /app/packages/www/dist ./www
 ENV DATA_DIR=/data
+RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 EXPOSE 8080
 USER node
