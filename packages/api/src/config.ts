@@ -26,7 +26,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   const num = (v: string | undefined, fallback: number): number => {
-    if (v === undefined) return fallback;
+    if (v === undefined || v.trim() === '') return fallback;
     const n = Number(v);
     if (!Number.isFinite(n)) throw new Error(`Invalid numeric env value: ${v}`);
     return n;

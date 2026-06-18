@@ -36,7 +36,7 @@ async function add(): Promise<void> {
       <tbody>
         <tr v-for="a in data.accounts" :key="a.handle" class="border-t border-gray-800">
           <td class="py-2">@{{ a.handle }}</td>
-          <td><span :class="a.last_status === 'error' ? 'text-red-400' : 'text-green-400'">{{ a.last_status ?? '—' }}</span></td>
+          <td><span :class="a.last_status ? (a.last_status === 'error' ? 'text-red-400' : 'text-green-400') : 'text-gray-400'">{{ a.last_status ?? '—' }}</span></td>
           <td class="text-gray-400 text-xs">{{ a.last_fetched_at ? new Date(a.last_fetched_at).toLocaleString() : '—' }}</td>
           <td><input type="checkbox" :checked="a.enabled" @change="data.toggle(a.handle, !a.enabled)" /></td>
           <td><button class="text-red-400 text-xs hover:text-red-300" @click="data.remove(a.handle)">Remove</button></td>
