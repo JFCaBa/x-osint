@@ -12,7 +12,7 @@ const handleSchema = z.object({ handle: z.string().min(1).max(50) });
 const enabledSchema = z.object({ enabled: z.boolean() });
 
 const filterSchema = z.object({
-  label: z.string().trim().min(1).max(40),
+  label: z.string().trim().min(1).max(40).regex(/^[^,]+$/),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   emoji: z.string().max(8).optional().default(''),
 });

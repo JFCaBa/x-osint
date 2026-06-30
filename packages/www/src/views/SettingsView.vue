@@ -24,6 +24,7 @@ function validate(): string | null {
   for (const r of rows.value) {
     const label = r.label.trim();
     if (!label || label.length > 40) return 'each filter needs a label (max 40 chars)';
+    if (label.includes(',')) return `label cannot contain a comma: ${label}`;
     if (seen.has(label.toLowerCase())) return `duplicate label: ${label}`;
     seen.add(label.toLowerCase());
     if (!/^#[0-9a-fA-F]{6}$/.test(r.color)) return `invalid color for "${label}"`;

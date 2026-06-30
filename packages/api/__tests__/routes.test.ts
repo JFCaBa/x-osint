@@ -161,6 +161,14 @@ describe('settings routes', () => {
     expect((await auth(request(ctx.app).put('/api/settings').send({ filters: [{ label: 'a', color: '#111111', emoji: '' }, { label: 'A', color: '#222222', emoji: '' }] }))).status).toBe(400);
   });
 
+  it('PUT /settings rejects a label containing a comma', async () => {
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).put('/api/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ filters: [{ label: 'money, finance', color: '#112233', emoji: '' }] });
+    expect(res.status).toBe(400);
+  });
+
   it('POST /settings/reclassify resets posts and returns the queued count', async () => {
     const token = await tokenFor(ctx.app);
     const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
