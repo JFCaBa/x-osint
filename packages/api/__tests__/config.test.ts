@@ -43,3 +43,28 @@ describe('loadConfig', () => {
       .toThrow(/NITTER_INSTANCES/);
   });
 });
+
+describe('config AI defaults', () => {
+  it('defaults AI settings when env is absent', () => {
+    const c = loadConfig({ X_OSINT_PASSWORD: 'pw' });
+    expect(c.aiProvider).toBe('ollama');
+    expect(c.ollamaHost).toBe('http://localhost:11434');
+    expect(c.aiModel).toBe('gemma3:4b');
+    expect(c.reportTz).toBe('Europe/London');
+  });
+
+  it('reads AI overrides from env', () => {
+    const c = loadConfig({
+      X_OSINT_PASSWORD: 'pw', AI_PROVIDER: 'none',
+      OLLAMA_HOST: 'http://ollama:11434', AI_MODEL: 'gemma3:1b', REPORT_TZ: 'UTC',
+    });
+    expect(c.aiProvider).toBe('none');
+    expect(c.ollamaHost).toBe('http://ollama:11434');
+    expect(c.aiModel).toBe('gemma3:1b');
+    expect(c.reportTz).toBe('UTC');
+  });
+
+  it('rejects an invalid AI_PROVIDER', () => {
+    expect(() => loadConfig({ X_OSINT_PASSWORD: 'pw', AI_PROVIDER: 'openai' })).toThrow();
+  });
+});

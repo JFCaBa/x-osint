@@ -31,4 +31,8 @@ export interface Config {
   tokenTtlDays: number;
   tokenSecret: string;
   nitterInstances: NitterInstance[];
+  aiProvider: 'ollama' | 'none';
+  ollamaHost: string;
+  aiModel: string;
+  reportTz: string;
 }
