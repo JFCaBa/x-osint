@@ -25,6 +25,15 @@ onMounted(() => { data.loadAccounts(); data.loadPosts(); data.loadFilters(); });
 function applyFilters(): void {
   data.loadPosts({ q: search.value || undefined, handle: handleFilter.value || undefined });
 }
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+function onSearchInput(): void {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 300); // debounced live search
+}
+function applyNow(): void {
+  clearTimeout(searchTimer);
+  applyFilters();
+}
 async function refresh(): Promise<void> {
   await data.refresh();
   setTimeout(applyFilters, 1500); // give the poll a moment, then reload
@@ -34,7 +43,7 @@ async function refresh(): Promise<void> {
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex gap-2 items-center">
-      <input v-model="search" placeholder="Search text" @keyup.enter="applyFilters"
+      <input v-model="search" placeholder="Search text" @input="onSearchInput" @keyup.enter="applyNow"
         class="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm" />
       <select v-model="handleFilter" @change="applyFilters"
         class="bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm">
