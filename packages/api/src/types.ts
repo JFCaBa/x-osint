@@ -1,3 +1,9 @@
+export interface Filter {
+  label: string;
+  color: string;
+  emoji: string;
+}
+
 export interface Post {
   id: string;
   handle: string;

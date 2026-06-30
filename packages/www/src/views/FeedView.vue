@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useData } from '../stores/data';
+import { badgeStyle } from '../services/badges';
+import type { Post, Filter } from '../services/api';
 
 const data = useData();
 const search = ref('');
 const handleFilter = ref('');
 
-onMounted(() => { data.loadAccounts(); data.loadPosts(); });
+const filterByLabel = computed(() => {
+  const m = new Map<string, Filter>();
+  for (const f of data.filters) m.set(f.label.toLowerCase(), f);
+  return m;
+});
+function angleLabels(p: Post): string[] {
+  return p.angles ? p.angles.split(',').filter(Boolean) : [];
+}
+function filterFor(label: string): Filter | undefined {
+  return filterByLabel.value.get(label.toLowerCase());
+}
+
+onMounted(() => { data.loadAccounts(); data.loadPosts(); data.loadFilters(); });
 
 function applyFilters(): void {
   data.loadPosts({ q: search.value || undefined, handle: handleFilter.value || undefined });
@@ -46,6 +60,13 @@ async function refresh(): Promise<void> {
           <a v-if="p.url" :href="p.url" target="_blank" rel="noreferrer" class="ml-auto hover:text-gray-200">open ↗</a>
         </div>
         <p class="text-sm mt-1 whitespace-pre-wrap break-words">{{ p.text }}</p>
+        <div v-if="angleLabels(p).length" class="flex flex-wrap gap-1 mt-2">
+          <span v-for="lbl in angleLabels(p)" :key="lbl"
+            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border"
+            :style="badgeStyle(filterFor(lbl))">
+            <span v-if="filterFor(lbl)?.emoji">{{ filterFor(lbl)!.emoji }}</span>{{ lbl }}
+          </span>
+        </div>
       </div>
     </article>
   </div>

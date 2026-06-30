@@ -12,9 +12,9 @@ export function createAiProcessor(deps: { repo: Repo; provider: AiProvider; batc
   const { repo, provider } = deps;
   const batchSize = deps.batchSize ?? 25;
 
-  async function processOne(post: Post): Promise<void> {
+  async function processOne(post: Post, labels: string[]): Promise<void> {
     try {
-      const { match, angles } = await provider.classify(post.text);
+      const { match, angles } = await provider.classify(post.text, labels);
       const textPt = match ? await provider.translate(post.text) : null;
       repo.setPostAi(post.id, { status: 'done', match, angles, textPt });
     } catch (err) {
@@ -24,18 +24,20 @@ export function createAiProcessor(deps: { repo: Repo; provider: AiProvider; batc
   }
 
   async function processBatch(): Promise<number> {
+    const labels = repo.getFilters().map(f => f.label);
     const posts = repo.listPostsNeedingAi(batchSize);
-    for (const post of posts) await processOne(post);
+    for (const post of posts) await processOne(post, labels);
     return posts.length;
   }
 
   async function processAll(): Promise<void> {
+    const labels = repo.getFilters().map(f => f.label);
     const attempted = new Set<string>();
     const allPosts = repo.listPostsNeedingAi(Number.MAX_SAFE_INTEGER);
     for (const post of allPosts) {
       if (attempted.has(post.id)) continue;
       attempted.add(post.id);
-      await processOne(post);
+      await processOne(post, labels);
     }
   }
 

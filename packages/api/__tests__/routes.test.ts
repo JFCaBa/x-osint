@@ -131,3 +131,52 @@ describe('reports routes', () => {
     expect(only.body.map((p: { id: string }) => p.id)).toEqual(['1']);
   });
 });
+
+describe('settings routes', () => {
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(() => { ctx = setup(); });
+
+  it('GET /settings returns the default filters', async () => {
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/settings').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.filters.map((f: { label: string }) => f.label)).toEqual(['money', 'entrepreneurship', 'business', 'economy']);
+  });
+
+  it('PUT /settings saves valid filters', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    const ok = await auth(request(ctx.app).put('/api/settings').send({ filters: [{ label: 'tech', color: '#112233', emoji: '🤖' }] }));
+    expect(ok.status).toBe(200);
+    expect(ok.body.filters).toEqual([{ label: 'tech', color: '#112233', emoji: '🤖' }]);
+    const got = await auth(request(ctx.app).get('/api/settings'));
+    expect(got.body.filters[0].label).toBe('tech');
+  });
+
+  it('PUT /settings rejects invalid input', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    expect((await auth(request(ctx.app).put('/api/settings').send({ filters: [] }))).status).toBe(400);
+    expect((await auth(request(ctx.app).put('/api/settings').send({ filters: [{ label: 'x', color: 'red', emoji: '' }] }))).status).toBe(400);
+    expect((await auth(request(ctx.app).put('/api/settings').send({ filters: [{ label: 'a', color: '#111111', emoji: '' }, { label: 'A', color: '#222222', emoji: '' }] }))).status).toBe(400);
+  });
+
+  it('PUT /settings rejects a label containing a comma', async () => {
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).put('/api/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ filters: [{ label: 'money, finance', color: '#112233', emoji: '' }] });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /settings/reclassify resets posts and returns the queued count', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    ctx.repo.upsertPosts([{ id: '1', handle: 'h', text: 't', url: null, media_url: null, posted_at: '2026-06-18T00:00:00.000Z', fetched_at: '2026-06-18T00:00:00.000Z' }]);
+    ctx.repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    const res = await auth(request(ctx.app).post('/api/settings/reclassify'));
+    expect(res.status).toBe(200);
+    expect(res.body.queued).toBe(1);
+    expect(ctx.repo.listPostsNeedingAi(10)).toHaveLength(1);
+  });
+});

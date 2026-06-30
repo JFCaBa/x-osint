@@ -11,6 +11,18 @@ type Repo = ReturnType<typeof createRepo>;
 const handleSchema = z.object({ handle: z.string().min(1).max(50) });
 const enabledSchema = z.object({ enabled: z.boolean() });
 
+const filterSchema = z.object({
+  label: z.string().trim().min(1).max(40).regex(/^[^,]+$/),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  emoji: z.string().max(8).optional().default(''),
+});
+const filtersBodySchema = z.object({
+  filters: z.array(filterSchema).min(1).max(20).refine(
+    fs => new Set(fs.map(f => f.label.toLowerCase())).size === fs.length,
+    'labels must be unique',
+  ),
+});
+
 function normalizeHandle(h: string): string {
   return h.replace(/^@/, '').trim().toLowerCase();
 }
@@ -106,6 +118,23 @@ export function createRoutes(config: Config, repo: Repo, triggerFetch: () => voi
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.xlsx"');
     res.send(buffer);
+  });
+
+  router.get('/settings', auth, (_req: Request, res: Response) => {
+    res.json({ filters: repo.getFilters() });
+  });
+
+  router.put('/settings', auth, (req: Request, res: Response) => {
+    const body = filtersBodySchema.safeParse(req.body);
+    if (!body.success) { res.status(400).json({ error: 'invalid filters' }); return; }
+    repo.setFilters(body.data.filters);
+    res.json({ filters: repo.getFilters() });
+  });
+
+  router.post('/settings/reclassify', auth, (_req: Request, res: Response) => {
+    const queued = repo.resetAiStatus();
+    triggerFetch();
+    res.json({ queued });
   });
 
   return router;

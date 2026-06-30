@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ANGLES, type AiProvider, type ClassifyResult } from './provider.js';
+import { type AiProvider, type ClassifyResult } from './provider.js';
 
 const TIMEOUT_MS = 30_000;
 
@@ -25,11 +25,12 @@ const defaultPostJson: PostJson = async (url, body, timeoutMs) => {
   }
 };
 
-const CLASSIFY_SYSTEM =
-  'You are a strict text classifier. Decide whether the post has at least one of these angles: ' +
-  'money, entrepreneurship, business, economy. Respond ONLY with JSON of the form ' +
-  '{"match": boolean, "angles": string[]} where angles is a subset of ' +
-  '["money","entrepreneurship","business","economy"]. No prose.';
+function classifySystem(labels: string[]): string {
+  return 'You are a strict text classifier. Decide which of these topics the post is related to: '
+    + labels.join(', ') + '. Respond ONLY with JSON of the form '
+    + '{"match": boolean, "angles": string[]} where angles is the subset of exactly those topics '
+    + 'the post matches. No prose.';
+}
 
 const TRANSLATE_SYSTEM =
   'You are a translator. Translate the user message into European Portuguese. ' +
@@ -67,12 +68,17 @@ export class OllamaProvider implements AiProvider {
     return messageSchema.parse(res.json).message.content;
   }
 
-  async classify(text: string): Promise<ClassifyResult> {
-    const content = await this.chat(CLASSIFY_SYSTEM, text, true);
+  async classify(text: string, labels: string[]): Promise<ClassifyResult> {
+    if (labels.length === 0) return { match: false, angles: [] };
+    const content = await this.chat(classifySystem(labels), text, true);
     const parsed = classifySchema.parse(JSON.parse(content));
-    const valid = (ANGLES as readonly string[]);
-    const angles = (parsed.angles ?? []).filter(a => valid.includes(a));
-    return { match: parsed.match === true || angles.length > 0, angles };
+    const canon = new Map(labels.map(l => [l.toLowerCase(), l]));
+    const angles: string[] = [];
+    for (const a of parsed.angles ?? []) {
+      const hit = canon.get(String(a).toLowerCase());
+      if (hit && !angles.includes(hit)) angles.push(hit);
+    }
+    return { match: angles.length > 0, angles };
   }
 
   async translate(text: string): Promise<string> {
