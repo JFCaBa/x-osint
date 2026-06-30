@@ -89,6 +89,7 @@ export function createRoutes(config: Config, repo: Repo, triggerFetch: () => voi
       since: typeof q.since === 'string' ? q.since : undefined,
       limit,
       angleOnly: q.angleOnly === 'true',
+      angle: typeof q.angle === 'string' ? q.angle : undefined,
     }));
   });
 

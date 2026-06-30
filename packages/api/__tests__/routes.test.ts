@@ -132,6 +132,25 @@ describe('reports routes', () => {
   });
 });
 
+describe('posts angle filter route', () => {
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(() => { ctx = setup(); });
+
+  it('filters /posts by a specific angle label', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    ctx.repo.upsertPosts([
+      { id: '1', handle: 'alice', text: 't1', url: null, media_url: null, posted_at: '2026-06-18T00:00:00.000Z', fetched_at: '2026-06-18T00:00:00.000Z' },
+      { id: '2', handle: 'alice', text: 't2', url: null, media_url: null, posted_at: '2026-06-19T00:00:00.000Z', fetched_at: '2026-06-19T00:00:00.000Z' },
+    ]);
+    ctx.repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    ctx.repo.setPostAi('2', { status: 'done', match: true, angles: ['business'], textPt: 'y' });
+    const res = await auth(request(ctx.app).get('/api/posts?angle=money'));
+    expect(res.status).toBe(200);
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual(['1']);
+  });
+});
+
 describe('settings routes', () => {
   let ctx: ReturnType<typeof setup>;
   beforeEach(() => { ctx = setup(); });

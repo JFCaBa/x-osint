@@ -156,6 +156,24 @@ describe('repo AI + exports', () => {
   });
 });
 
+describe('repo angle filter', () => {
+  let repo: ReturnType<typeof createRepo>;
+  beforeEach(() => { repo = createRepo(openDb(':memory:')); });
+
+  it('filters posts by an exact angle label (CSV membership, no substring match)', () => {
+    repo.upsertPosts([
+      makePost('1', 'h', '2026-06-18T00:00:00.000Z'),
+      makePost('2', 'h', '2026-06-19T00:00:00.000Z'),
+    ]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money', 'business'], textPt: 'a' });
+    repo.setPostAi('2', { status: 'done', match: true, angles: ['economy'], textPt: 'b' });
+    expect(repo.listPosts({ angle: 'money' }).map(p => p.id)).toEqual(['1']);
+    expect(repo.listPosts({ angle: 'business' }).map(p => p.id)).toEqual(['1']);
+    expect(repo.listPosts({ angle: 'economy' }).map(p => p.id)).toEqual(['2']);
+    expect(repo.listPosts({ angle: 'eco' })).toHaveLength(0);
+  });
+});
+
 describe('repo settings + filters', () => {
   let repo: ReturnType<typeof createRepo>;
   beforeEach(() => { repo = createRepo(openDb(':memory:')); });

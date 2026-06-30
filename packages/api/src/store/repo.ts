@@ -92,13 +92,14 @@ export function createRepo(db: Database.Database) {
       return tx(posts);
     },
 
-    listPosts(opts: { handle?: string; q?: string; since?: string; limit?: number; angleOnly?: boolean }): Post[] {
+    listPosts(opts: { handle?: string; q?: string; since?: string; limit?: number; angleOnly?: boolean; angle?: string }): Post[] {
       const where: string[] = [];
       const params: Record<string, string> = {};
       if (opts.handle) { where.push('handle = @handle'); params.handle = opts.handle; }
       if (opts.q) { where.push('text LIKE @q'); params.q = `%${opts.q}%`; }
       if (opts.since) { where.push('posted_at > @since'); params.since = opts.since; }
       if (opts.angleOnly) { where.push('angle_match = 1'); }
+      if (opts.angle) { where.push("(',' || angles || ',') LIKE @anglePat"); params.anglePat = `%,${opts.angle},%`; }
       const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const limit = opts.limit && opts.limit > 0 ? `LIMIT ${Math.floor(opts.limit)}` : '';
       return db.prepare(`SELECT * FROM posts ${clause} ORDER BY posted_at DESC ${limit}`).all(params) as Post[];
