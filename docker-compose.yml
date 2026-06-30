@@ -22,6 +22,17 @@ services:
       - ollama-models:/root/.ollama
     ports:
       - "11434:11434"
+    restart: unless-stopped
+  # One-shot: pulls the model into the shared volume on `up`, then exits.
+  # The app keeps running meanwhile and starts classifying once the model lands.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${AI_MODEL:-gemma3:4b}"]
+    restart: "no"
 
 volumes:
   x-data:

@@ -51,7 +51,10 @@ Portuguese. The **Reports** page exports matching stories to an Excel file
 (`Date | X handle | Text (PT) | Post link`), either **since the last export** or for a
 **date range**. The Feed has a "Money/business only" toggle.
 
-First run, pull the model:
+On `docker compose up`, the bundled `ollama-pull` one-shot service downloads the model
+automatically into a named volume (cached across restarts; first pull of `gemma3:4b` is
+~3 GB). The app starts immediately and begins classifying once the model finishes
+downloading — no manual step. To pull a different model later, or to pull by hand:
 
 ```bash
 docker compose exec ollama ollama pull gemma3:4b
