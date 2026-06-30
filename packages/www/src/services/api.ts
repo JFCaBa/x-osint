@@ -80,12 +80,13 @@ export const api = {
   removeAccount(handle: string): Promise<void> {
     return call<void>('DELETE', `/accounts/${encodeURIComponent(handle)}`);
   },
-  listPosts(params: { handle?: string; q?: string; limit?: number; angleOnly?: boolean }): Promise<Post[]> {
+  listPosts(params: { handle?: string; q?: string; limit?: number; angleOnly?: boolean; angle?: string }): Promise<Post[]> {
     const qs = new URLSearchParams();
     if (params.handle) qs.set('handle', params.handle);
     if (params.q) qs.set('q', params.q);
     if (params.limit) qs.set('limit', String(params.limit));
     if (params.angleOnly) qs.set('angleOnly', 'true');
+    if (params.angle) qs.set('angle', params.angle);
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
     return call<Post[]>('GET', `/posts${suffix}`);
   },
