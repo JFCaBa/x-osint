@@ -3,20 +3,35 @@
 Self-hosted collector for X/Twitter accounts. Pulls posts from a watchlist via Nitter RSS
 (no X API, no login), stores them in SQLite, and serves a web reader + JSON API.
 
-## Run with Docker (one command)
+## Run with Docker
 
-```bash
-docker run -p 8080:8080 -v x-data:/data -e X_OSINT_PASSWORD=yourpassword x-osint
-```
-
-Or with compose:
+### Recommended: Compose (full stack, with AI)
 
 ```bash
 X_OSINT_PASSWORD=yourpassword docker compose up -d --build
 ```
 
-Open http://localhost:8080, log in with your password, add accounts on the **Accounts**
-page, and watch posts appear on the **Feed**.
+This brings up the app **plus** Ollama and a one-shot `ollama-pull` service that downloads
+the AI model for you. The command is the same on every run; only the **first boot is slow**
+because it builds the image and downloads the `gemma3:4b` model (~3 GB). After that, the
+image is cached and the model persists in a named volume, so restarts are fast.
+
+> After a `git pull`, keep the `--build` flag so Compose rebuilds the image with the new
+> code (otherwise it may reuse a stale image).
+
+### Collector only (single container, no AI)
+
+```bash
+docker run -p 8080:8080 -v x-data:/data -e X_OSINT_PASSWORD=yourpassword x-osint
+```
+
+This runs the collector by itself with **no Ollama**, so AI classification/translation is
+unavailable — the Feed still collects posts, but the angle filter and Reports export will be
+empty. To enable AI on this path, point `OLLAMA_HOST` at a reachable Ollama instance; to
+silence it, set `AI_PROVIDER=none`.
+
+Either way, open http://localhost:8080, log in with your password, add accounts on the
+**Accounts** page, and watch posts appear on the **Feed**.
 
 ## Configuration (env vars)
 
