@@ -108,7 +108,7 @@ export function createRepo(db: Database.Database) {
         id,
         status: v.status,
         match: v.match === undefined ? null : (v.match ? 1 : 0),
-        angles: v.angles ? v.angles.join(',') : null,
+        angles: v.angles?.length ? v.angles.join(',') : null,
         textPt: v.textPt ?? null,
       });
     },

@@ -121,4 +121,10 @@ describe('repo AI + exports', () => {
     const r = repo.listExportablePosts({ mode: 'range', from: '2026-06-15T00:00:00.000Z', to: '2026-06-16T00:00:00.000Z' });
     expect(r.map(p => p.id)).toEqual(['2']);
   });
+
+  it('stores null for an empty angles array', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z')]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: [], textPt: 'x' });
+    expect(repo.listPosts({})[0].angles).toBeNull();
+  });
 });
