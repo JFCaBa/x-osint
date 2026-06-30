@@ -32,6 +32,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return n;
   };
 
+  const aiProviderRaw = (env.AI_PROVIDER ?? 'ollama').trim();
+  if (aiProviderRaw !== 'ollama' && aiProviderRaw !== 'none') {
+    throw new Error("AI_PROVIDER must be 'ollama' or 'none'");
+  }
+  const aiProvider = aiProviderRaw;
+
   return {
     password,
     port: num(env.PORT, 8080),
@@ -41,5 +47,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tokenTtlDays: num(env.TOKEN_TTL_DAYS, 7),
     tokenSecret: env.TOKEN_SECRET ?? password,
     nitterInstances,
+    aiProvider,
+    ollamaHost: env.OLLAMA_HOST?.trim() || 'http://localhost:11434',
+    aiModel: env.AI_MODEL?.trim() || 'gemma3:4b',
+    reportTz: env.REPORT_TZ?.trim() || 'Europe/London',
   };
 }

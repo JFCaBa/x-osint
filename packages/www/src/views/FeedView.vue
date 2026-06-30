@@ -27,6 +27,10 @@ async function refresh(): Promise<void> {
         <option value="">All accounts</option>
         <option v-for="a in data.accounts" :key="a.handle" :value="a.handle">@{{ a.handle }}</option>
       </select>
+      <label class="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap">
+        <input type="checkbox" v-model="data.angleOnly" @change="applyFilters" />
+        Money/business only
+      </label>
       <button class="bg-cyan-600 hover:bg-cyan-500 rounded px-3 py-2 text-sm" @click="refresh">Refresh</button>
     </div>
 

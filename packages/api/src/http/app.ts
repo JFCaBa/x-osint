@@ -12,12 +12,13 @@ export interface AppDeps {
   repo: Repo;
   triggerFetch: () => void;
   staticDir?: string;
+  aiAvailable?: boolean;
 }
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
   app.use(express.json());
-  app.use('/api', createRoutes(deps.config, deps.repo, deps.triggerFetch));
+  app.use('/api', createRoutes(deps.config, deps.repo, deps.triggerFetch, deps.aiAvailable ?? false));
 
   if (deps.staticDir && existsSync(deps.staticDir)) {
     app.use(express.static(deps.staticDir));

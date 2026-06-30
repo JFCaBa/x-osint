@@ -76,12 +76,13 @@ export function createRepo(db: Database.Database) {
       return tx(posts);
     },
 
-    listPosts(opts: { handle?: string; q?: string; since?: string; limit?: number }): Post[] {
+    listPosts(opts: { handle?: string; q?: string; since?: string; limit?: number; angleOnly?: boolean }): Post[] {
       const where: string[] = [];
       const params: Record<string, string> = {};
       if (opts.handle) { where.push('handle = @handle'); params.handle = opts.handle; }
       if (opts.q) { where.push('text LIKE @q'); params.q = `%${opts.q}%`; }
       if (opts.since) { where.push('posted_at > @since'); params.since = opts.since; }
+      if (opts.angleOnly) { where.push('angle_match = 1'); }
       const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const limit = opts.limit && opts.limit > 0 ? `LIMIT ${Math.floor(opts.limit)}` : '';
       return db.prepare(`SELECT * FROM posts ${clause} ORDER BY posted_at DESC ${limit}`).all(params) as Post[];
@@ -90,6 +91,59 @@ export function createRepo(db: Database.Database) {
     pruneOldPosts(retentionDays: number): number {
       const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
       return db.prepare('DELETE FROM posts WHERE posted_at < ?').run(cutoff).changes;
+    },
+
+    listPostsNeedingAi(limit: number): Post[] {
+      return db.prepare(
+        `SELECT * FROM posts
+         WHERE ai_status IS NULL OR ai_status = 'pending' OR ai_status = 'error'
+         ORDER BY posted_at DESC LIMIT ?`,
+      ).all(Math.max(1, Math.floor(limit))) as Post[];
+    },
+
+    setPostAi(id: string, v: { status: 'done' | 'error'; match?: boolean; angles?: string[]; textPt?: string | null }): void {
+      db.prepare(
+        `UPDATE posts SET ai_status = @status, angle_match = @match, angles = @angles, text_pt = @textPt WHERE id = @id`,
+      ).run({
+        id,
+        status: v.status,
+        match: v.match === undefined ? null : (v.match ? 1 : 0),
+        angles: v.angles?.length ? v.angles.join(',') : null,
+        textPt: v.textPt ?? null,
+      });
+    },
+
+    listExportablePosts(opts: { mode: 'since-last' | 'range'; from?: string; to?: string }): Post[] {
+      const where = ['angle_match = 1'];
+      const params: Record<string, string> = {};
+      if (opts.mode === 'since-last') {
+        where.push('exported_at IS NULL');
+      } else {
+        const expandFrom = (d: string): string => /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00.000Z` : d;
+        const expandTo = (d: string): string => /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T23:59:59.999Z` : d;
+        if (opts.from) { where.push('posted_at >= @from'); params.from = expandFrom(opts.from); }
+        if (opts.to) { where.push('posted_at <= @to'); params.to = expandTo(opts.to); }
+      }
+      return db.prepare(
+        `SELECT * FROM posts WHERE ${where.join(' AND ')} ORDER BY posted_at ASC`,
+      ).all(params) as Post[];
+    },
+
+    markExported(ids: string[], exportedAt: string): void {
+      if (ids.length === 0) return;
+      const placeholders = ids.map(() => '?').join(',');
+      db.prepare(`UPDATE posts SET exported_at = ? WHERE id IN (${placeholders})`).run(exportedAt, ...ids);
+    },
+
+    recordExport(v: { coveredUpto: string | null; rowCount: number }): void {
+      db.prepare('INSERT INTO exports (exported_at, covered_upto, row_count) VALUES (?, ?, ?)')
+        .run(new Date().toISOString(), v.coveredUpto, v.rowCount);
+    },
+
+    getExportState(): { lastExportAt: string | null; coveredUpto: string | null } {
+      const row = db.prepare('SELECT MAX(exported_at) AS lastExportAt, MAX(covered_upto) AS coveredUpto FROM exports')
+        .get() as { lastExportAt: string | null; coveredUpto: string | null };
+      return { lastExportAt: row.lastExportAt ?? null, coveredUpto: row.coveredUpto ?? null };
     },
   };
 }

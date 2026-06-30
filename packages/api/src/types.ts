@@ -6,6 +6,11 @@ export interface Post {
   media_url: string | null;
   posted_at: string;   // ISO 8601
   fetched_at: string;  // ISO 8601
+  ai_status?: string | null;
+  angle_match?: number | null;
+  angles?: string | null;
+  text_pt?: string | null;
+  exported_at?: string | null;
 }
 
 export interface Account {
@@ -31,4 +36,8 @@ export interface Config {
   tokenTtlDays: number;
   tokenSecret: string;
   nitterInstances: NitterInstance[];
+  aiProvider: 'ollama' | 'none';
+  ollamaHost: string;
+  aiModel: string;
+  reportTz: string;
 }

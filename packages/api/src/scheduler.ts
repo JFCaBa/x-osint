@@ -6,9 +6,10 @@ import { logger } from './logger.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
-export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: HttpGet }): { start(): void; stop(): void; triggerNow(): void } {
+export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: HttpGet; aiProcess?: () => Promise<void> }): { start(): void; stop(): void; triggerNow(): void } {
   const { config, repo } = deps;
   const httpGet = deps.httpGet ?? httpsGet;
+  const aiProcess = deps.aiProcess;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let pruneTimer: ReturnType<typeof setInterval> | null = null;
   let initTimer: ReturnType<typeof setTimeout> | null = null;
@@ -27,6 +28,10 @@ export function createScheduler(deps: { config: Config; repo: Repo; httpGet?: Ht
         if (result.posts.length) total += repo.upsertPosts(result.posts);
       }
       logger.info({ accounts: handles.length, newPosts: total }, 'poll complete');
+      if (aiProcess) {
+        try { await aiProcess(); }
+        catch (err) { logger.error({ err }, 'ai processing failed'); }
+      }
     } catch (err) {
       logger.error({ err }, 'poll failed');
     } finally {

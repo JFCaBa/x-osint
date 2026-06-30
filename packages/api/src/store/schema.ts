@@ -18,4 +18,10 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS idx_posts_posted_at ON posts(posted_at);
 CREATE INDEX IF NOT EXISTS idx_posts_handle    ON posts(handle);
+CREATE TABLE IF NOT EXISTS exports (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  exported_at   TEXT NOT NULL,
+  covered_upto  TEXT,
+  row_count     INTEGER NOT NULL
+);
 `;

@@ -64,3 +64,94 @@ describe('repo', () => {
     expect(repo.listPosts({}).map(p => p.id)).toEqual(['new']);
   });
 });
+
+describe('repo AI + exports', () => {
+  let repo: ReturnType<typeof createRepo>;
+  beforeEach(() => { repo = createRepo(openDb(':memory:')); });
+
+  it('lists posts needing AI and updates them', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z')]);
+    expect(repo.listPostsNeedingAi(10)).toHaveLength(1);
+
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money', 'business'], textPt: 'olá' });
+    expect(repo.listPostsNeedingAi(10)).toHaveLength(0);
+
+    const [p] = repo.listPosts({});
+    expect(p.angle_match).toBe(1);
+    expect(p.angles).toBe('money,business');
+    expect(p.text_pt).toBe('olá');
+  });
+
+  it('re-queues errored posts for AI', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z')]);
+    repo.setPostAi('1', { status: 'error' });
+    expect(repo.listPostsNeedingAi(10)).toHaveLength(1);
+  });
+
+  it('filters posts by angleOnly', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z'), makePost('2', 'h', '2026-06-19T00:00:00.000Z')]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    repo.setPostAi('2', { status: 'done', match: false, angles: [] });
+    expect(repo.listPosts({ angleOnly: true }).map(p => p.id)).toEqual(['1']);
+    expect(repo.listPosts({})).toHaveLength(2);
+  });
+
+  it('since-last excludes already-exported matches', () => {
+    repo.upsertPosts([
+      makePost('1', 'h', '2026-06-18T00:00:00.000Z'),
+      makePost('2', 'h', '2026-06-20T00:00:00.000Z'),
+    ]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'a' });
+    repo.setPostAi('2', { status: 'done', match: true, angles: ['business'], textPt: 'b' });
+    expect(repo.listExportablePosts({ mode: 'since-last' }).map(p => p.id)).toEqual(['1', '2']);
+    repo.markExported(['1'], '2026-06-19T00:00:00.000Z');
+    expect(repo.listExportablePosts({ mode: 'since-last' }).map(p => p.id)).toEqual(['2']);
+  });
+
+  it('since-last still surfaces a post classified after an earlier export (no silent loss)', () => {
+    repo.upsertPosts([
+      makePost('old', 'h', '2026-06-10T00:00:00.000Z'),
+      makePost('new', 'h', '2026-06-20T00:00:00.000Z'),
+    ]);
+    repo.setPostAi('new', { status: 'done', match: true, angles: ['money'], textPt: 'n' }); // 'old' still pending
+    const first = repo.listExportablePosts({ mode: 'since-last' });
+    expect(first.map(p => p.id)).toEqual(['new']);
+    repo.markExported(first.map(p => p.id), '2026-06-21T00:00:00.000Z');
+    // 'old' is classified as a match only now, after the export
+    repo.setPostAi('old', { status: 'done', match: true, angles: ['business'], textPt: 'o' });
+    expect(repo.listExportablePosts({ mode: 'since-last' }).map(p => p.id)).toEqual(['old']);
+  });
+
+  it('records export metadata for lastExportAt', () => {
+    repo.recordExport({ coveredUpto: '2026-06-18T00:00:00.000Z', rowCount: 1 });
+    expect(repo.getExportState().lastExportAt).not.toBeNull();
+  });
+
+  it('exports a date range inclusive of bounds', () => {
+    repo.upsertPosts([
+      makePost('1', 'h', '2026-06-10T00:00:00.000Z'),
+      makePost('2', 'h', '2026-06-15T12:00:00.000Z'),
+      makePost('3', 'h', '2026-06-20T00:00:00.000Z'),
+    ]);
+    for (const id of ['1', '2', '3']) repo.setPostAi(id, { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    const r = repo.listExportablePosts({ mode: 'range', from: '2026-06-15T00:00:00.000Z', to: '2026-06-16T00:00:00.000Z' });
+    expect(r.map(p => p.id)).toEqual(['2']);
+  });
+
+  it('date range includes the full end day for date-only bounds', () => {
+    repo.upsertPosts([
+      makePost('1', 'h', '2026-06-30T14:30:00.000Z'),
+      makePost('2', 'h', '2026-07-01T09:00:00.000Z'),
+    ]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    repo.setPostAi('2', { status: 'done', match: true, angles: ['money'], textPt: 'y' });
+    const r = repo.listExportablePosts({ mode: 'range', from: '2026-06-30', to: '2026-06-30' });
+    expect(r.map(p => p.id)).toEqual(['1']);
+  });
+
+  it('stores null for an empty angles array', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z')]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: [], textPt: 'x' });
+    expect(repo.listPosts({})[0].angles).toBeNull();
+  });
+});

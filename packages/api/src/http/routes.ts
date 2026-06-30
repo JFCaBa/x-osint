@@ -4,6 +4,7 @@ import type { Config } from '../types.js';
 import type { createRepo } from '../store/repo.js';
 import { signToken, comparePassword } from '../auth/token.js';
 import { makeAuthMiddleware } from './authMiddleware.js';
+import { buildWorkbookBuffer } from '../reports/excel.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
@@ -14,7 +15,13 @@ function normalizeHandle(h: string): string {
   return h.replace(/^@/, '').trim().toLowerCase();
 }
 
-export function createRoutes(config: Config, repo: Repo, triggerFetch: () => void): Router {
+const reportParamsSchema = z.object({
+  mode: z.enum(['since-last', 'range']).default('since-last'),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+export function createRoutes(config: Config, repo: Repo, triggerFetch: () => void, aiAvailable = false): Router {
   const router = Router();
   const auth = makeAuthMiddleware(config.tokenSecret);
 
@@ -69,12 +76,36 @@ export function createRoutes(config: Config, repo: Repo, triggerFetch: () => voi
       q: typeof q.q === 'string' ? q.q : undefined,
       since: typeof q.since === 'string' ? q.since : undefined,
       limit,
+      angleOnly: q.angleOnly === 'true',
     }));
   });
 
   router.post('/fetch', auth, (_req: Request, res: Response) => {
     triggerFetch();
     res.json({ started: true });
+  });
+
+  router.get('/reports/summary', auth, (req: Request, res: Response) => {
+    const parsed = reportParamsSchema.safeParse({
+      mode: req.query.mode, from: req.query.from, to: req.query.to,
+    });
+    if (!parsed.success) { res.status(400).json({ error: 'invalid params' }); return; }
+    const posts = repo.listExportablePosts(parsed.data);
+    const { lastExportAt } = repo.getExportState();
+    res.json({ count: posts.length, lastExportAt, aiAvailable });
+  });
+
+  router.post('/reports/export', auth, async (req: Request, res: Response) => {
+    const parsed = reportParamsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) { res.status(400).json({ error: 'invalid params' }); return; }
+    const posts = repo.listExportablePosts(parsed.data);
+    const buffer = await buildWorkbookBuffer(posts, config.reportTz);
+    const coveredUpto = posts.length ? posts[posts.length - 1]!.posted_at : null;
+    repo.recordExport({ coveredUpto, rowCount: posts.length });
+    repo.markExported(posts.map(p => p.id), new Date().toISOString());
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.xlsx"');
+    res.send(buffer);
   });
 
   return router;

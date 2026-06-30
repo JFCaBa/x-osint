@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
+// Register xlsx content-type with the binary (image) parser so supertest returns
+// res.body as a Buffer instead of an empty object for xlsx responses.
+// (supertest calls .buffer() in its constructor which forces buffer=true; without
+//  an explicit parser registered, superagent falls through to the text parser.)
+import superagent from 'superagent';
+(superagent as any).parse['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] =
+  (superagent as any).parse.image;
 import { createApp } from '../src/http/app.js';
 import { openDb } from '../src/store/db.js';
 import { createRepo } from '../src/store/repo.js';
@@ -9,7 +16,7 @@ function setup() {
   const config = loadConfig({ X_OSINT_PASSWORD: 'pw' });
   const repo = createRepo(openDb(':memory:'));
   const triggerFetch = vi.fn();
-  const app = createApp({ config, repo, triggerFetch });
+  const app = createApp({ config, repo, triggerFetch, aiAvailable: true });
   return { app, repo, triggerFetch };
 }
 
@@ -75,5 +82,52 @@ describe('routes', () => {
     const res = await request(ctx.app).get('/api/posts?handle=alice').set('Authorization', `Bearer ${token}`);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].id).toBe('1');
+  });
+});
+
+describe('reports routes', () => {
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(() => { ctx = setup(); });
+
+  async function seedMatch(id: string, postedAt: string) {
+    ctx.repo.upsertPosts([{ id, handle: 'alice', text: `t${id}`, url: `https://x.com/alice/status/${id}`, media_url: null, posted_at: postedAt, fetched_at: postedAt }]);
+    ctx.repo.setPostAi(id, { status: 'done', match: true, angles: ['money'], textPt: `pt${id}` });
+  }
+
+  it('summary counts matching posts and reports aiAvailable', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    await seedMatch('1', '2026-06-18T00:00:00.000Z');
+    const res = await auth(request(ctx.app).get('/api/reports/summary?mode=since-last'));
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(1);
+    expect(res.body.lastExportAt).toBeNull();
+    expect(typeof res.body.aiAvailable).toBe('boolean');
+  });
+
+  it('export returns an xlsx and advances since-last', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    await seedMatch('1', '2026-06-18T00:00:00.000Z');
+    const res = await auth(request(ctx.app).post('/api/reports/export').send({ mode: 'since-last' }));
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('spreadsheetml');
+    expect(Buffer.isBuffer(res.body) || res.body.length > 0).toBeTruthy();
+    // a second since-last summary now shows 0 (export advanced covered_upto)
+    const after = await auth(request(ctx.app).get('/api/reports/summary?mode=since-last'));
+    expect(after.body.count).toBe(0);
+    expect(after.body.lastExportAt).not.toBeNull();
+  });
+
+  it('filters /posts by angleOnly', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    await seedMatch('1', '2026-06-18T00:00:00.000Z');
+    ctx.repo.upsertPosts([{ id: '2', handle: 'alice', text: 't2', url: null, media_url: null, posted_at: '2026-06-19T00:00:00.000Z', fetched_at: '2026-06-19T00:00:00.000Z' }]);
+    ctx.repo.setPostAi('2', { status: 'done', match: false, angles: [] });
+    const all = await auth(request(ctx.app).get('/api/posts'));
+    expect(all.body).toHaveLength(2);
+    const only = await auth(request(ctx.app).get('/api/posts?angleOnly=true'));
+    expect(only.body.map((p: { id: string }) => p.id)).toEqual(['1']);
   });
 });
