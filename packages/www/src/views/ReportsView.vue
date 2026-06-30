@@ -49,18 +49,20 @@ onMounted(refreshSummary);
     <div class="flex flex-col gap-3 bg-gray-800 rounded-lg p-4">
       <div class="flex gap-4 text-sm">
         <label class="flex items-center gap-1">
-          <input type="radio" value="since-last" v-model="mode" @change="refreshSummary" /> Since last export
+          <input type="radio" value="since-last" v-model="mode" @change="refreshSummary" name="report-mode" /> Since last export
         </label>
         <label class="flex items-center gap-1">
-          <input type="radio" value="range" v-model="mode" @change="refreshSummary" /> Date range
+          <input type="radio" value="range" v-model="mode" @change="refreshSummary" name="report-mode" /> Date range
         </label>
       </div>
 
       <div v-if="mode === 'range'" class="flex gap-2 items-center text-sm">
         <input type="date" v-model="from" @change="refreshSummary"
+          aria-label="From date"
           class="bg-gray-900 border border-gray-700 rounded px-2 py-1" />
         <span class="text-gray-500">to</span>
         <input type="date" v-model="to" @change="refreshSummary"
+          aria-label="To date"
           class="bg-gray-900 border border-gray-700 rounded px-2 py-1" />
       </div>
 
