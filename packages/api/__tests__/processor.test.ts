@@ -55,4 +55,13 @@ describe('aiProcessor', () => {
     await proc.processAll();
     expect(repo.listPostsNeedingAi(99)).toHaveLength(0);
   });
+
+  it('processAll terminates when the provider always fails', async () => {
+    const repo = createRepo(openDb(':memory:'));
+    repo.upsertPosts(Array.from({ length: 4 }, (_, i) => makePost(String(i))));
+    const provider = mockProvider({ classify: vi.fn(async () => { throw new Error('down'); }) });
+    const proc = createAiProcessor({ repo, provider, batchSize: 2 });
+    await proc.processAll(); // must not hang
+    expect(repo.listPosts({}).every(p => p.ai_status === 'error')).toBe(true);
+  });
 });
