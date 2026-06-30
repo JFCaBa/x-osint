@@ -50,6 +50,13 @@ describe('reports api', () => {
     await api.listPosts({ angleOnly: true });
     expect(fetchMock.mock.calls[0][0]).toContain('angleOnly=true');
   });
+
+  it('listPosts passes a specific angle', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await api.listPosts({ angle: 'money' });
+    expect(fetchMock.mock.calls[0][0]).toContain('angle=money');
+  });
 });
 
 describe('settings api', () => {
