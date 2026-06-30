@@ -79,7 +79,7 @@ async function reclassify(): Promise<void> {
           class="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm" />
         <input v-model="r.color" type="color" aria-label="Color"
           class="w-10 h-8 bg-gray-900 border border-gray-700 rounded" />
-        <button class="text-gray-400 hover:text-red-400 text-sm px-2" @click="removeRow(i)">✕</button>
+        <button aria-label="Remove filter" class="text-gray-400 hover:text-red-400 text-sm px-2" @click="removeRow(i)">✕</button>
       </div>
       <button class="self-start text-cyan-400 hover:text-cyan-300 text-sm" @click="addRow">+ add filter</button>
     </div>
