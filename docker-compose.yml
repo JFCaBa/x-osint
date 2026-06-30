@@ -8,9 +8,21 @@ services:
       X_OSINT_PASSWORD: "${X_OSINT_PASSWORD:-changeme}"
       POLL_INTERVAL_MIN: "5"
       RETENTION_DAYS: "30"
+      OLLAMA_HOST: http://ollama:11434
+      AI_MODEL: ${AI_MODEL:-gemma3:4b}
+      REPORT_TZ: ${REPORT_TZ:-Europe/London}
     volumes:
       - x-data:/data
     restart: unless-stopped
+    depends_on:
+      - ollama
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
 
 volumes:
   x-data:
+  ollama-models:
