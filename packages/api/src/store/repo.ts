@@ -1,5 +1,12 @@
 import type Database from 'better-sqlite3';
-import type { Account, Post } from '../types.js';
+import type { Account, Post, Filter } from '../types.js';
+
+const DEFAULT_CLASSIFY_FILTERS: Filter[] = [
+  { label: 'money', color: '#22c55e', emoji: '💰' },
+  { label: 'entrepreneurship', color: '#3b82f6', emoji: '🚀' },
+  { label: 'business', color: '#a855f7', emoji: '🏢' },
+  { label: 'economy', color: '#f59e0b', emoji: '📈' },
+];
 
 interface AccountRow {
   handle: string;
@@ -27,6 +34,15 @@ export function createRepo(db: Database.Database) {
   function getAccount(handle: string): Account | null {
     const row = getAccountStmt.get(handle) as AccountRow | undefined;
     return row ? rowToAccount(row) : null;
+  }
+
+  function getSettingRaw(key: string): string | null {
+    const r = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+    return r?.value ?? null;
+  }
+  function setSettingRaw(key: string, value: string): void {
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, value);
   }
 
   return {
@@ -144,6 +160,32 @@ export function createRepo(db: Database.Database) {
       const row = db.prepare('SELECT MAX(exported_at) AS lastExportAt, MAX(covered_upto) AS coveredUpto FROM exports')
         .get() as { lastExportAt: string | null; coveredUpto: string | null };
       return { lastExportAt: row.lastExportAt ?? null, coveredUpto: row.coveredUpto ?? null };
+    },
+
+    getSetting(key: string): string | null { return getSettingRaw(key); },
+    setSetting(key: string, value: string): void { setSettingRaw(key, value); },
+
+    getFilters(): Filter[] {
+      const raw = getSettingRaw('classify_filters');
+      if (!raw) return DEFAULT_CLASSIFY_FILTERS;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0
+          && parsed.every(f => f && typeof (f as Filter).label === 'string')) {
+          return parsed as Filter[];
+        }
+        return DEFAULT_CLASSIFY_FILTERS;
+      } catch {
+        return DEFAULT_CLASSIFY_FILTERS;
+      }
+    },
+
+    setFilters(filters: Filter[]): void {
+      setSettingRaw('classify_filters', JSON.stringify(filters));
+    },
+
+    resetAiStatus(): number {
+      return db.prepare("UPDATE posts SET ai_status = 'pending'").run().changes;
     },
   };
 }

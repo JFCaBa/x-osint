@@ -155,3 +155,40 @@ describe('repo AI + exports', () => {
     expect(repo.listPosts({})[0].angles).toBeNull();
   });
 });
+
+describe('repo settings + filters', () => {
+  let repo: ReturnType<typeof createRepo>;
+  beforeEach(() => { repo = createRepo(openDb(':memory:')); });
+
+  it('getFilters returns defaults when unset', () => {
+    expect(repo.getFilters().map(f => f.label)).toEqual(['money', 'entrepreneurship', 'business', 'economy']);
+    expect(repo.getFilters()[0]).toEqual({ label: 'money', color: '#22c55e', emoji: '💰' });
+  });
+
+  it('round-trips filters via setFilters/getFilters', () => {
+    repo.setFilters([{ label: 'tech', color: '#111111', emoji: '🤖' }]);
+    expect(repo.getFilters()).toEqual([{ label: 'tech', color: '#111111', emoji: '🤖' }]);
+  });
+
+  it('getFilters falls back to defaults on malformed JSON', () => {
+    repo.setSetting('classify_filters', 'not json');
+    expect(repo.getFilters()).toHaveLength(4);
+  });
+
+  it('getSetting/setSetting round-trip', () => {
+    expect(repo.getSetting('x')).toBeNull();
+    repo.setSetting('x', 'y');
+    expect(repo.getSetting('x')).toBe('y');
+    repo.setSetting('x', 'z');
+    expect(repo.getSetting('x')).toBe('z');
+  });
+
+  it('resetAiStatus marks all posts pending and preserves exported_at', () => {
+    repo.upsertPosts([makePost('1', 'h', '2026-06-18T00:00:00.000Z')]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['money'], textPt: 'x' });
+    repo.markExported(['1'], '2026-06-19T00:00:00.000Z');
+    expect(repo.resetAiStatus()).toBe(1);
+    expect(repo.listPostsNeedingAi(10).map(p => p.id)).toEqual(['1']);
+    expect(repo.listPosts({})[0].exported_at).toBe('2026-06-19T00:00:00.000Z');
+  });
+});
