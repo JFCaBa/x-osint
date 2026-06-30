@@ -172,6 +172,16 @@ describe('repo angle filter', () => {
     expect(repo.listPosts({ angle: 'economy' }).map(p => p.id)).toEqual(['2']);
     expect(repo.listPosts({ angle: 'eco' })).toHaveLength(0);
   });
+
+  it('treats underscore in an angle label literally, not as a wildcard', () => {
+    repo.upsertPosts([
+      makePost('1', 'h', '2026-06-18T00:00:00.000Z'),
+      makePost('2', 'h', '2026-06-19T00:00:00.000Z'),
+    ]);
+    repo.setPostAi('1', { status: 'done', match: true, angles: ['b2b_saas'], textPt: 'a' });
+    repo.setPostAi('2', { status: 'done', match: true, angles: ['b2bxsaas'], textPt: 'b' });
+    expect(repo.listPosts({ angle: 'b2b_saas' }).map(p => p.id)).toEqual(['1']);
+  });
 });
 
 describe('repo settings + filters', () => {

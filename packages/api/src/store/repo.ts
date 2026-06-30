@@ -99,7 +99,10 @@ export function createRepo(db: Database.Database) {
       if (opts.q) { where.push('text LIKE @q'); params.q = `%${opts.q}%`; }
       if (opts.since) { where.push('posted_at > @since'); params.since = opts.since; }
       if (opts.angleOnly) { where.push('angle_match = 1'); }
-      if (opts.angle) { where.push("(',' || angles || ',') LIKE @anglePat"); params.anglePat = `%,${opts.angle},%`; }
+      if (opts.angle) {
+        where.push("(',' || angles || ',') LIKE @anglePat ESCAPE '\\'");
+        params.anglePat = `%,${opts.angle.replace(/[\\%_]/g, c => '\\' + c)},%`;
+      }
       const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
       const limit = opts.limit && opts.limit > 0 ? `LIMIT ${Math.floor(opts.limit)}` : '';
       return db.prepare(`SELECT * FROM posts ${clause} ORDER BY posted_at DESC ${limit}`).all(params) as Post[];
