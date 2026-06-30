@@ -6,7 +6,7 @@ export const useData = defineStore('data', () => {
   const accounts = ref<Account[]>([]);
   const posts = ref<Post[]>([]);
   const loading = ref(false);
-  const angleOnly = ref(false);
+  const angleFilter = ref('');
   const reportSummary = ref<ReportSummary | null>(null);
 
   async function loadAccounts(): Promise<void> { accounts.value = await api.listAccounts(); }
@@ -24,7 +24,9 @@ export const useData = defineStore('data', () => {
   }
   async function loadPosts(params: { handle?: string; q?: string } = {}): Promise<void> {
     loading.value = true;
-    try { posts.value = await api.listPosts({ ...params, angleOnly: angleOnly.value, limit: 200 }); }
+    const sel = angleFilter.value;
+    const extra = sel === '' ? {} : sel === '__any__' ? { angleOnly: true } : { angle: sel };
+    try { posts.value = await api.listPosts({ ...params, ...extra, limit: 200 }); }
     finally { loading.value = false; }
   }
   async function refresh(): Promise<void> { await api.triggerFetch(); }
@@ -41,7 +43,7 @@ export const useData = defineStore('data', () => {
   async function reclassifyAll(): Promise<number> { return (await api.reclassifyAll()).queued; }
 
   return {
-    accounts, posts, loading, angleOnly, reportSummary,
+    accounts, posts, loading, angleFilter, reportSummary,
     loadAccounts, addAccount, toggle, remove, loadPosts, refresh,
     loadReportSummary, exportReport,
     filters, loadFilters, saveFilters, reclassifyAll,
