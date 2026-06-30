@@ -11,7 +11,7 @@ function makePost(id: string): Post {
 
 function mockProvider(over: Partial<AiProvider> = {}): AiProvider {
   return {
-    classify: vi.fn(async (t: string) => ({ match: t.includes('1'), angles: t.includes('1') ? ['money'] : [] })),
+    classify: vi.fn(async (t: string, _labels: string[]) => ({ match: t.includes('1'), angles: t.includes('1') ? ['money'] : [] })),
     translate: vi.fn(async () => 'traduzido'),
     ...over,
   };
@@ -36,6 +36,15 @@ describe('aiProcessor', () => {
     expect(p2.angle_match).toBe(0);
     expect(p2.text_pt).toBeNull();
     expect(repo.listPostsNeedingAi(10)).toHaveLength(0);
+  });
+
+  it('passes the configured filter labels to classify', async () => {
+    const repo = createRepo(openDb(':memory:'));
+    repo.setFilters([{ label: 'tech', color: '#111111', emoji: '🤖' }]);
+    repo.upsertPosts([makePost('1')]);
+    const provider = mockProvider();
+    await createAiProcessor({ repo, provider }).processBatch();
+    expect(provider.classify).toHaveBeenCalledWith('text 1', ['tech']);
   });
 
   it('marks a post error when the provider throws', async () => {
