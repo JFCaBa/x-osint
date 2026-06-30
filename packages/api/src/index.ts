@@ -6,6 +6,8 @@ import { openDb } from './store/db.js';
 import { createRepo } from './store/repo.js';
 import { createScheduler } from './scheduler.js';
 import { createApp } from './http/app.js';
+import { createAiProvider } from './ai/factory.js';
+import { createAiProcessor } from './ai/processor.js';
 import { logger } from './logger.js';
 
 function main(): void {
@@ -13,13 +15,23 @@ function main(): void {
   mkdirSync(config.dataDir, { recursive: true });
   const db = openDb(join(config.dataDir, 'x-osint.db'));
   const repo = createRepo(db);
-  const scheduler = createScheduler({ config, repo });
+  const provider = createAiProvider(config);
+  const processor = provider ? createAiProcessor({ repo, provider }) : null;
+  const scheduler = createScheduler({
+    config, repo,
+    aiProcess: processor ? () => processor.processAll() : undefined,
+  });
 
   // Built SPA lives next to dist/ at runtime: <app>/www
   const here = dirname(fileURLToPath(import.meta.url));
   const staticDir = join(here, '..', 'www');
 
-  const app = createApp({ config, repo, triggerFetch: () => scheduler.triggerNow(), staticDir });
+  const app = createApp({
+    config, repo,
+    triggerFetch: () => scheduler.triggerNow(),
+    staticDir,
+    aiAvailable: provider !== null,
+  });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, 'x-osint listening');
     scheduler.start();
