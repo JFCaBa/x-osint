@@ -28,3 +28,26 @@ describe('api client', () => {
     await expect(api.listAccounts()).rejects.toBeInstanceOf(ApiError);
   });
 });
+
+describe('reports api', () => {
+  beforeEach(() => { api.setToken('tok'); });
+
+  it('reportsSummary builds the query string', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ count: 3, lastExportAt: null, aiAvailable: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await api.reportsSummary({ mode: 'range', from: '2026-06-01', to: '2026-06-30' });
+    expect(r.count).toBe(3);
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toContain('/api/reports/summary?');
+    expect(url).toContain('mode=range');
+    expect(url).toContain('from=2026-06-01');
+    expect(url).toContain('to=2026-06-30');
+  });
+
+  it('listPosts passes angleOnly', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await api.listPosts({ angleOnly: true });
+    expect(fetchMock.mock.calls[0][0]).toContain('angleOnly=true');
+  });
+});
