@@ -3,6 +3,7 @@ import { useAuth } from './stores/auth';
 import LoginView from './views/LoginView.vue';
 import FeedView from './views/FeedView.vue';
 import AccountsView from './views/AccountsView.vue';
+import ReportsView from './views/ReportsView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,6 +11,7 @@ const router = createRouter({
     { path: '/login', component: LoginView },
     { path: '/', component: FeedView },
     { path: '/accounts', component: AccountsView },
+    { path: '/reports', component: ReportsView },
   ],
 });
 
