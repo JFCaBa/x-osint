@@ -51,3 +51,35 @@ describe('reports api', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('angleOnly=true');
   });
 });
+
+describe('settings api', () => {
+  beforeEach(() => { api.setToken('tok'); });
+
+  it('getSettings GETs /settings', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ filters: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await api.getSettings();
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/settings');
+    expect((opts as RequestInit).method).toBe('GET');
+  });
+
+  it('saveSettings PUTs the filters', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ filters: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await api.saveSettings([{ label: 'tech', color: '#112233', emoji: '🤖' }]);
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/settings');
+    expect((opts as RequestInit).method).toBe('PUT');
+    expect(JSON.parse((opts as RequestInit).body as string)).toEqual({ filters: [{ label: 'tech', color: '#112233', emoji: '🤖' }] });
+  });
+
+  it('reclassifyAll POSTs /settings/reclassify', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ queued: 3 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await api.reclassifyAll()).toEqual({ queued: 3 });
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/settings/reclassify');
+    expect((opts as RequestInit).method).toBe('POST');
+  });
+});

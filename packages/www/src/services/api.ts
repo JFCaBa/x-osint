@@ -30,6 +30,12 @@ export interface ReportParams {
   to?: string;
 }
 
+export interface Filter {
+  label: string;
+  color: string;
+  emoji: string;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -108,4 +114,7 @@ export const api = {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
   },
+  getSettings(): Promise<{ filters: Filter[] }> { return call<{ filters: Filter[] }>('GET', '/settings'); },
+  saveSettings(filters: Filter[]): Promise<{ filters: Filter[] }> { return call<{ filters: Filter[] }>('PUT', '/settings', { filters }); },
+  reclassifyAll(): Promise<{ queued: number }> { return call<{ queued: number }>('POST', '/settings/reclassify'); },
 };
