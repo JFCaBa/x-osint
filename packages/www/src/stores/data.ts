@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { api, type Account, type Post, type ReportParams, type ReportSummary } from '../services/api';
+import { api, type Account, type Post, type ReportParams, type ReportSummary, type Filter } from '../services/api';
 
 export const useData = defineStore('data', () => {
   const accounts = ref<Account[]>([]);
@@ -35,9 +35,15 @@ export const useData = defineStore('data', () => {
     await api.exportReport(params);
   }
 
+  const filters = ref<Filter[]>([]);
+  async function loadFilters(): Promise<void> { filters.value = (await api.getSettings()).filters; }
+  async function saveFilters(next: Filter[]): Promise<void> { filters.value = (await api.saveSettings(next)).filters; }
+  async function reclassifyAll(): Promise<number> { return (await api.reclassifyAll()).queued; }
+
   return {
     accounts, posts, loading, angleOnly, reportSummary,
     loadAccounts, addAccount, toggle, remove, loadPosts, refresh,
     loadReportSummary, exportReport,
+    filters, loadFilters, saveFilters, reclassifyAll,
   };
 });
