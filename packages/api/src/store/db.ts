@@ -6,6 +6,7 @@ const POST_COLUMNS: Record<string, string> = {
   angle_match: 'INTEGER',
   angles: 'TEXT',
   text_pt: 'TEXT',
+  exported_at: 'TEXT',
 };
 
 export function migrate(db: Database.Database): void {

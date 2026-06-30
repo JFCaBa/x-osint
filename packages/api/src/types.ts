@@ -10,6 +10,7 @@ export interface Post {
   angle_match?: number | null;
   angles?: string | null;
   text_pt?: string | null;
+  exported_at?: string | null;
 }
 
 export interface Account {

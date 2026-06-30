@@ -102,6 +102,7 @@ export function createRoutes(config: Config, repo: Repo, triggerFetch: () => voi
     const buffer = await buildWorkbookBuffer(posts, config.reportTz);
     const coveredUpto = posts.length ? posts[posts.length - 1]!.posted_at : null;
     repo.recordExport({ coveredUpto, rowCount: posts.length });
+    repo.markExported(posts.map(p => p.id), new Date().toISOString());
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.xlsx"');
     res.send(buffer);

@@ -117,15 +117,22 @@ export function createRepo(db: Database.Database) {
       const where = ['angle_match = 1'];
       const params: Record<string, string> = {};
       if (opts.mode === 'since-last') {
-        const covered = (db.prepare('SELECT MAX(covered_upto) AS c FROM exports').get() as { c: string | null }).c;
-        if (covered) { where.push('posted_at > @covered'); params.covered = covered; }
+        where.push('exported_at IS NULL');
       } else {
-        if (opts.from) { where.push('posted_at >= @from'); params.from = opts.from; }
-        if (opts.to) { where.push('posted_at <= @to'); params.to = opts.to; }
+        const expandFrom = (d: string): string => /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00.000Z` : d;
+        const expandTo = (d: string): string => /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T23:59:59.999Z` : d;
+        if (opts.from) { where.push('posted_at >= @from'); params.from = expandFrom(opts.from); }
+        if (opts.to) { where.push('posted_at <= @to'); params.to = expandTo(opts.to); }
       }
       return db.prepare(
         `SELECT * FROM posts WHERE ${where.join(' AND ')} ORDER BY posted_at ASC`,
       ).all(params) as Post[];
+    },
+
+    markExported(ids: string[], exportedAt: string): void {
+      if (ids.length === 0) return;
+      const placeholders = ids.map(() => '?').join(',');
+      db.prepare(`UPDATE posts SET exported_at = ? WHERE id IN (${placeholders})`).run(exportedAt, ...ids);
     },
 
     recordExport(v: { coveredUpto: string | null; rowCount: number }): void {
