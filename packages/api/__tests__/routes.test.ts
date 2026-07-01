@@ -12,11 +12,15 @@ import { openDb } from '../src/store/db.js';
 import { createRepo } from '../src/store/repo.js';
 import { loadConfig } from '../src/config.js';
 
-function setup() {
+function setup(opts: { aiAvailable?: boolean; checkAiReady?: () => Promise<boolean> } = {}) {
   const config = loadConfig({ X_OSINT_PASSWORD: 'pw' });
   const repo = createRepo(openDb(':memory:'));
   const triggerFetch = vi.fn();
-  const app = createApp({ config, repo, triggerFetch, aiAvailable: true });
+  const app = createApp({
+    config, repo, triggerFetch,
+    aiAvailable: opts.aiAvailable ?? true,
+    checkAiReady: opts.checkAiReady,
+  });
   return { app, repo, triggerFetch };
 }
 
@@ -197,5 +201,34 @@ describe('settings routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.queued).toBe(1);
     expect(ctx.repo.listPostsNeedingAi(10)).toHaveLength(1);
+  });
+});
+
+describe('ai status route', () => {
+  it('requires auth', async () => {
+    const { app } = setup();
+    expect((await request(app).get('/api/ai/status')).status).toBe(401);
+  });
+
+  it('reports configured + ready when the model is present', async () => {
+    const ctx = setup({ aiAvailable: true, checkAiReady: async () => true });
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/ai/status').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ configured: true, model: 'gemma3:4b', ready: true });
+  });
+
+  it('reports configured but not ready while the model is downloading', async () => {
+    const ctx = setup({ aiAvailable: true, checkAiReady: async () => false });
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/ai/status').set('Authorization', `Bearer ${token}`);
+    expect(res.body).toEqual({ configured: true, model: 'gemma3:4b', ready: false });
+  });
+
+  it('reports not-configured with a null model when AI is off', async () => {
+    const ctx = setup({ aiAvailable: false });
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/ai/status').set('Authorization', `Bearer ${token}`);
+    expect(res.body).toEqual({ configured: false, model: null, ready: false });
   });
 });
