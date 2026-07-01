@@ -6,6 +6,9 @@ const TIMEOUT_MS = 30_000;
 export type PostJson = (url: string, body: unknown, timeoutMs: number)
   => Promise<{ ok: boolean; status: number; json: unknown }>;
 
+export type GetJson = (url: string, timeoutMs: number)
+  => Promise<{ ok: boolean; status: number; json: unknown }>;
+
 const defaultPostJson: PostJson = async (url, body, timeoutMs) => {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -16,6 +19,20 @@ const defaultPostJson: PostJson = async (url, body, timeoutMs) => {
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
+    const json = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false, status: 0, json: null };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const defaultGetJson: GetJson = async (url, timeoutMs) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
     const json = await res.json().catch(() => null);
     return { ok: res.ok, status: res.status, json };
   } catch {
@@ -43,15 +60,37 @@ const classifySchema = z.object({
 
 const messageSchema = z.object({ message: z.object({ content: z.string() }) });
 
+const tagsSchema = z.object({ models: z.array(z.object({ name: z.string() })) });
+
 export class OllamaProvider implements AiProvider {
   private host: string;
   private model: string;
   private postJson: PostJson;
+  private getJson: GetJson;
+  private readyCache = false;
 
-  constructor(deps: { host: string; model: string; postJson?: PostJson }) {
+  constructor(deps: { host: string; model: string; postJson?: PostJson; getJson?: GetJson }) {
     this.host = deps.host.replace(/\/$/, '');
     this.model = deps.model;
     this.postJson = deps.postJson ?? defaultPostJson;
+    this.getJson = deps.getJson ?? defaultGetJson;
+  }
+
+  async ready(): Promise<boolean> {
+    if (this.readyCache) return true;
+    const res = await this.getJson(`${this.host}/api/tags`, TIMEOUT_MS);
+    if (!res.ok) return false;
+    const parsed = tagsSchema.safeParse(res.json);
+    if (!parsed.success) return false;
+    const want = this.model.toLowerCase();
+    const wantBase = want.split(':')[0];
+    const hasTag = want.includes(':');
+    const found = parsed.data.models.some(m => {
+      const name = m.name.toLowerCase();
+      return name === want || (!hasTag && name.split(':')[0] === wantBase);
+    });
+    if (found) this.readyCache = true;
+    return found;
   }
 
   private async chat(system: string, user: string, json: boolean): Promise<string> {
