@@ -94,3 +94,23 @@ describe('OllamaProvider.ready', () => {
     expect((getJson as any).mock.calls.length).toBe(1);
   });
 });
+
+describe('OllamaProvider.summarize', () => {
+  it('summarizes posts, mentions the tag in the system prompt, and returns trimmed prose', async () => {
+    const post = stub('  Rates dominated the week.  ');
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    const out = await p.summarize(['post one', 'post two'], 'money');
+    expect(out).toBe('Rates dominated the week.');
+    const [url, body] = (post as any).mock.calls[0];
+    expect(url).toBe('http://x/api/chat');
+    expect((body as any).format).toBeUndefined(); // prose, not json mode
+    const system = (body as any).messages[0].content as string;
+    expect(system).toContain('money');
+  });
+
+  it('throws when ollama returns non-ok', async () => {
+    const post: PostJson = vi.fn(async () => ({ ok: false, status: 500, json: null }));
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await expect(p.summarize(['x'], 'money')).rejects.toThrow();
+  });
+});
