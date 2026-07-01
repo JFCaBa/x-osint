@@ -5,6 +5,9 @@ import type { createRepo } from '../store/repo.js';
 import { signToken, comparePassword } from '../auth/token.js';
 import { makeAuthMiddleware } from './authMiddleware.js';
 import { buildWorkbookBuffer } from '../reports/excel.js';
+import { buildAnalysisMarkdown } from '../reports/analysis.js';
+import { zipReport } from '../reports/zip.js';
+import type { AiProvider } from '../ai/provider.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
@@ -39,6 +42,7 @@ export function createRoutes(
   triggerFetch: () => void,
   aiAvailable = false,
   checkAiReady: () => Promise<boolean> = async () => false,
+  aiProvider: AiProvider | null = null,
 ): Router {
   const router = Router();
   const auth = makeAuthMiddleware(config.tokenSecret);
@@ -125,13 +129,17 @@ export function createRoutes(
     const parsed = reportParamsSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json({ error: 'invalid params' }); return; }
     const posts = repo.listExportablePosts(parsed.data);
-    const buffer = await buildWorkbookBuffer(posts, config.reportTz);
+    const xlsx = await buildWorkbookBuffer(posts, config.reportTz);
+    const markdown = await buildAnalysisMarkdown({
+      posts, filters: repo.getFilters(), tz: config.reportTz, provider: aiProvider,
+    });
+    const zip = await zipReport({ xlsx, markdown });
     const coveredUpto = posts.length ? posts[posts.length - 1]!.posted_at : null;
     repo.recordExport({ coveredUpto, rowCount: posts.length });
     repo.markExported(posts.map(p => p.id), new Date().toISOString());
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.xlsx"');
-    res.send(buffer);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.zip"');
+    res.send(zip);
   });
 
   router.get('/settings', auth, (_req: Request, res: Response) => {

@@ -7,6 +7,8 @@ import request from 'supertest';
 import superagent from 'superagent';
 (superagent as any).parse['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] =
   (superagent as any).parse.image;
+(superagent as any).parse['application/zip'] = (superagent as any).parse.image;
+import JSZip from 'jszip';
 import { createApp } from '../src/http/app.js';
 import { openDb } from '../src/store/db.js';
 import { createRepo } from '../src/store/repo.js';
@@ -109,14 +111,20 @@ describe('reports routes', () => {
     expect(typeof res.body.aiAvailable).toBe('boolean');
   });
 
-  it('export returns an xlsx and advances since-last', async () => {
+  it('export returns a zip with the workbook + analysis and advances since-last', async () => {
     const token = await tokenFor(ctx.app);
     const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
     await seedMatch('1', '2026-06-18T00:00:00.000Z');
     const res = await auth(request(ctx.app).post('/api/reports/export').send({ mode: 'since-last' }));
     expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toContain('spreadsheetml');
-    expect(Buffer.isBuffer(res.body) || res.body.length > 0).toBeTruthy();
+    expect(res.headers['content-type']).toContain('application/zip');
+    expect(res.headers['content-disposition']).toContain('x-osint-report.zip');
+    const zip = await JSZip.loadAsync(res.body);
+    expect(zip.file('x-osint-report.xlsx')).not.toBeNull();
+    const md = await zip.file('x-osint-analysis.md')!.async('string');
+    expect(md).toContain('# Analysis (English)');
+    expect(md).toContain('## money');
+    expect(md).toContain('# Análise (Português)');
     // a second since-last summary now shows 0 (export advanced covered_upto)
     const after = await auth(request(ctx.app).get('/api/reports/summary?mode=since-last'));
     expect(after.body.count).toBe(0);
