@@ -94,4 +94,50 @@ describe('buildAnalysisMarkdown', () => {
     const md = await buildAnalysisMarkdown({ posts, filters: FILTERS, tz: 'UTC', provider: stubProvider() });
     expect(md).toContain('## All posts');
   });
+
+  it('renders a null-url post without parentheses while a real-url post keeps them', async () => {
+    const posts = [
+      post({ id: '1', handle: 'nullhandle', angles: 'money', url: null, text: 'no url text', posted_at: '2026-06-18T00:00:00.000Z' }),
+      post({ id: '2', handle: 'realhandle', angles: 'money', url: 'https://x.com/real/2', text: 'has url text', posted_at: '2026-06-19T00:00:00.000Z' }),
+    ];
+    const md = await buildAnalysisMarkdown({ posts, filters: FILTERS, tz: 'UTC', provider: stubProvider() });
+    const nullLine = md.split('\n').find(l => l.startsWith('- @nullhandle'));
+    const realLine = md.split('\n').find(l => l.startsWith('- @realhandle'));
+    expect(nullLine).toBeDefined();
+    expect(nullLine).not.toContain('(');
+    expect(realLine).toBeDefined();
+    expect(realLine).toContain('(https://x.com/real/2)');
+  });
+
+  it('omits a tag with zero matching posts', async () => {
+    const posts = [post({ angles: 'money' })];
+    const md = await buildAnalysisMarkdown({ posts, filters: FILTERS, tz: 'UTC', provider: stubProvider() });
+    expect(md).toContain('## money');
+    expect(md).not.toContain('## business');
+  });
+
+  it('uses text_pt for Portuguese key posts and falls back to text when text_pt is null', async () => {
+    const posts = [
+      post({ id: '1', handle: 'alice', angles: 'money', text: 'ENGLISH ONE', text_pt: 'RESUMO PT UNICO', posted_at: '2026-06-20T00:00:00.000Z' }),
+      post({ id: '2', handle: 'bob', angles: 'money', text: 'FALLBACK ONLY', text_pt: null, posted_at: '2026-06-18T00:00:00.000Z' }),
+    ];
+    const md = await buildAnalysisMarkdown({ posts, filters: FILTERS, tz: 'UTC', provider: stubProvider() });
+    const dashIdx = md.indexOf('---');
+    const enPart = md.slice(0, dashIdx);
+    const ptPart = md.slice(dashIdx);
+    expect(ptPart).toContain('RESUMO PT UNICO');
+    expect(ptPart).toContain('FALLBACK ONLY');
+    expect(enPart).toContain('ENGLISH ONE');
+    expect(enPart).not.toContain('RESUMO PT UNICO');
+  });
+
+  it('keeps the English narrative but shows the PT unavailable note when translate() throws', async () => {
+    const provider = stubProvider({ translate: vi.fn(async () => { throw new Error('down'); }) });
+    const md = await buildAnalysisMarkdown({ posts: [post({})], filters: FILTERS, tz: 'UTC', provider });
+    const dashIdx = md.indexOf('---');
+    const enPart = md.slice(0, dashIdx);
+    expect(enPart).toContain('English summary.');
+    expect(md).toContain('_Resumo de IA indisponível._');
+    expect(md).not.toContain('_AI summary unavailable._');
+  });
 });
