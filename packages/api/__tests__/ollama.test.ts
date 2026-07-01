@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { OllamaProvider, type PostJson } from '../src/ai/ollama.js';
+import { OllamaProvider, type PostJson, type GetJson } from '../src/ai/ollama.js';
 
 function stub(content: string): PostJson {
   return vi.fn(async () => ({ ok: true, status: 200, json: { message: { content } } }));
@@ -53,5 +53,44 @@ describe('OllamaProvider.classify', () => {
   it('translates returning trimmed content', async () => {
     const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: stub('  Olá mundo  ') });
     expect(await p.translate('Hello world')).toBe('Olá mundo');
+  });
+});
+
+function tagsStub(names: string[]): GetJson {
+  return vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: { models: names.map(name => ({ name })) },
+  }));
+}
+
+describe('OllamaProvider.ready', () => {
+  it('is true when the configured model is present', async () => {
+    const p = new OllamaProvider({ host: 'http://x', model: 'gemma3:4b', getJson: tagsStub(['gemma3:4b', 'llama3:8b']) });
+    expect(await p.ready()).toBe(true);
+  });
+
+  it('is false when the configured model is absent', async () => {
+    const p = new OllamaProvider({ host: 'http://x', model: 'gemma3:4b', getJson: tagsStub(['llama3:8b']) });
+    expect(await p.ready()).toBe(false);
+  });
+
+  it('matches a tag-less configured model against a tagged entry', async () => {
+    const p = new OllamaProvider({ host: 'http://x', model: 'gemma3', getJson: tagsStub(['gemma3:4b']) });
+    expect(await p.ready()).toBe(true);
+  });
+
+  it('is false when ollama is unreachable', async () => {
+    const getJson: GetJson = vi.fn(async () => ({ ok: false, status: 0, json: null }));
+    const p = new OllamaProvider({ host: 'http://x', model: 'gemma3:4b', getJson });
+    expect(await p.ready()).toBe(false);
+  });
+
+  it('memoizes a true result and does not call ollama again', async () => {
+    const getJson = tagsStub(['gemma3:4b']);
+    const p = new OllamaProvider({ host: 'http://x', model: 'gemma3:4b', getJson });
+    expect(await p.ready()).toBe(true);
+    expect(await p.ready()).toBe(true);
+    expect((getJson as any).mock.calls.length).toBe(1);
   });
 });

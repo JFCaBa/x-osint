@@ -36,6 +36,12 @@ export interface Filter {
   emoji: string;
 }
 
+export interface AiStatus {
+  configured: boolean;
+  model: string | null;
+  ready: boolean;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -118,4 +124,5 @@ export const api = {
   getSettings(): Promise<{ filters: Filter[] }> { return call<{ filters: Filter[] }>('GET', '/settings'); },
   saveSettings(filters: Filter[]): Promise<{ filters: Filter[] }> { return call<{ filters: Filter[] }>('PUT', '/settings', { filters }); },
   reclassifyAll(): Promise<{ queued: number }> { return call<{ queued: number }>('POST', '/settings/reclassify'); },
+  aiStatus(): Promise<AiStatus> { return call<AiStatus>('GET', '/ai/status'); },
 };

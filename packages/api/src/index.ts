@@ -26,11 +26,15 @@ function main(): void {
   const here = dirname(fileURLToPath(import.meta.url));
   const staticDir = join(here, '..', 'www');
 
+  const checkAiReady = async (): Promise<boolean> =>
+    provider && provider.ready ? provider.ready() : false;
+
   const app = createApp({
     config, repo,
     triggerFetch: () => scheduler.triggerNow(),
     staticDir,
     aiAvailable: provider !== null,
+    checkAiReady,
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, 'x-osint listening');

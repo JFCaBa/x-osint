@@ -33,11 +33,24 @@ const reportParamsSchema = z.object({
   to: z.string().optional(),
 });
 
-export function createRoutes(config: Config, repo: Repo, triggerFetch: () => void, aiAvailable = false): Router {
+export function createRoutes(
+  config: Config,
+  repo: Repo,
+  triggerFetch: () => void,
+  aiAvailable = false,
+  checkAiReady: () => Promise<boolean> = async () => false,
+): Router {
   const router = Router();
   const auth = makeAuthMiddleware(config.tokenSecret);
 
   router.get('/health', (_req: Request, res: Response) => { res.json({ status: 'ok' }); });
+
+  router.get('/ai/status', auth, async (_req: Request, res: Response) => {
+    const configured = aiAvailable;
+    const model = configured ? config.aiModel : null;
+    const ready = configured ? await checkAiReady() : false;
+    res.json({ configured, model, ready });
+  });
 
   router.post('/login', (req: Request, res: Response) => {
     const body = z.object({ password: z.string() }).safeParse(req.body);
