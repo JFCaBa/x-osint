@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { type AiProvider, type ClassifyResult } from './provider.js';
 
 const TIMEOUT_MS = 30_000;
+const SUMMARIZE_TIMEOUT_MS = 120_000;
 
 export type PostJson = (url: string, body: unknown, timeoutMs: number)
   => Promise<{ ok: boolean; status: number; json: unknown }>;
@@ -99,7 +100,7 @@ export class OllamaProvider implements AiProvider {
     return found;
   }
 
-  private async chat(system: string, user: string, json: boolean): Promise<string> {
+  private async chat(system: string, user: string, json: boolean, timeoutMs: number = TIMEOUT_MS): Promise<string> {
     const res = await this.postJson(`${this.host}/api/chat`, {
       model: this.model,
       stream: false,
@@ -108,7 +109,7 @@ export class OllamaProvider implements AiProvider {
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    }, TIMEOUT_MS);
+    }, timeoutMs);
     if (!res.ok) throw new Error(`ollama request failed: ${res.status}`);
     return messageSchema.parse(res.json).message.content;
   }
@@ -133,7 +134,7 @@ export class OllamaProvider implements AiProvider {
 
   async summarize(posts: string[], tag: string): Promise<string> {
     const user = posts.map((t, i) => `${i + 1}. ${t}`).join('\n');
-    const content = await this.chat(summarizeSystem(tag), user, false);
+    const content = await this.chat(summarizeSystem(tag), user, false, SUMMARIZE_TIMEOUT_MS);
     return content.trim();
   }
 }

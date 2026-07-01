@@ -113,4 +113,18 @@ describe('OllamaProvider.summarize', () => {
     const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
     await expect(p.summarize(['x'], 'money')).rejects.toThrow();
   });
+
+  it('uses a longer 120s timeout to allow for cold model-load and multi-post summaries', async () => {
+    const post = stub('summary');
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await p.summarize(Array.from({ length: 40 }, (_, i) => `post ${i}`), 'money');
+    expect((post as any).mock.calls[0][2]).toBe(120000);
+  });
+
+  it('does not affect the default 30s timeout used by classify/translate', async () => {
+    const post = stub('  Olá mundo  ');
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await p.translate('Hello world');
+    expect((post as any).mock.calls[0][2]).toBe(30000);
+  });
 });
