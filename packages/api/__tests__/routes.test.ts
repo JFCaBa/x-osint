@@ -111,24 +111,51 @@ describe('reports routes', () => {
     expect(typeof res.body.aiAvailable).toBe('boolean');
   });
 
-  it('export returns a zip with the workbook + analysis and advances since-last', async () => {
+  async function runExport(app: ReturnType<typeof setup>['app'], token: string, body: object) {
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    const start = await auth(request(app).post('/api/reports/export').send(body));
+    expect(start.status).toBe(202);
+    const jobId = start.body.jobId as string;
+    let status: any;
+    for (let i = 0; i < 200; i++) {
+      const r = await auth(request(app).get(`/api/reports/export/${jobId}`));
+      status = r.body;
+      if (status.status !== 'running') break;
+      await new Promise(res => setTimeout(res, 10));
+    }
+    return { jobId, status };
+  }
+
+  it('export job yields a downloadable zip with workbook + analysis and advances since-last', async () => {
     const token = await tokenFor(ctx.app);
     const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
     await seedMatch('1', '2026-06-18T00:00:00.000Z');
-    const res = await auth(request(ctx.app).post('/api/reports/export').send({ mode: 'since-last' }));
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toContain('application/zip');
-    expect(res.headers['content-disposition']).toContain('x-osint-report.zip');
-    const zip = await JSZip.loadAsync(res.body);
+    const { jobId, status } = await runExport(ctx.app, token, { mode: 'since-last' });
+    expect(status.status).toBe('done');
+    const dl = await auth(request(ctx.app).get(`/api/reports/export/${jobId}/download`));
+    expect(dl.status).toBe(200);
+    expect(dl.headers['content-type']).toContain('application/zip');
+    expect(dl.headers['content-disposition']).toContain('x-osint-report.zip');
+    const zip = await JSZip.loadAsync(dl.body);
     expect(zip.file('x-osint-report.xlsx')).not.toBeNull();
     const md = await zip.file('x-osint-analysis.md')!.async('string');
     expect(md).toContain('# Analysis (English)');
     expect(md).toContain('## money');
     expect(md).toContain('# Análise (Português)');
-    // a second since-last summary now shows 0 (export advanced covered_upto)
+    // second download of the same job is gone
+    expect((await auth(request(ctx.app).get(`/api/reports/export/${jobId}/download`))).status).toBe(404);
+    // since-last advanced
     const after = await auth(request(ctx.app).get('/api/reports/summary?mode=since-last'));
     expect(after.body.count).toBe(0);
     expect(after.body.lastExportAt).not.toBeNull();
+  });
+
+  it('export start requires auth and unknown jobs 404', async () => {
+    expect((await request(ctx.app).post('/api/reports/export').send({ mode: 'since-last' })).status).toBe(401);
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    expect((await auth(request(ctx.app).get('/api/reports/export/nope'))).status).toBe(404);
+    expect((await auth(request(ctx.app).get('/api/reports/export/nope/download'))).status).toBe(404);
   });
 
   it('filters /posts by angleOnly', async () => {

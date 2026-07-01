@@ -8,6 +8,7 @@ import { buildWorkbookBuffer } from '../reports/excel.js';
 import { buildAnalysisMarkdown } from '../reports/analysis.js';
 import { zipReport } from '../reports/zip.js';
 import type { AiProvider } from '../ai/provider.js';
+import { createExportManager } from './exportJobs.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
@@ -46,6 +47,14 @@ export function createRoutes(
 ): Router {
   const router = Router();
   const auth = makeAuthMiddleware(config.tokenSecret);
+  const exportMgr = createExportManager({
+    repo,
+    tz: config.reportTz,
+    provider: aiProvider,
+    buildWorkbook: buildWorkbookBuffer,
+    buildMarkdown: buildAnalysisMarkdown,
+    zip: zipReport,
+  });
 
   router.get('/health', (_req: Request, res: Response) => { res.json({ status: 'ok' }); });
 
@@ -125,18 +134,22 @@ export function createRoutes(
     res.json({ count: posts.length, lastExportAt, aiAvailable });
   });
 
-  router.post('/reports/export', auth, async (req: Request, res: Response) => {
+  router.post('/reports/export', auth, (req: Request, res: Response) => {
     const parsed = reportParamsSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json({ error: 'invalid params' }); return; }
-    const posts = repo.listExportablePosts(parsed.data);
-    const xlsx = await buildWorkbookBuffer(posts, config.reportTz);
-    const markdown = await buildAnalysisMarkdown({
-      posts, filters: repo.getFilters(), tz: config.reportTz, provider: aiProvider,
-    });
-    const zip = await zipReport({ xlsx, markdown });
-    const coveredUpto = posts.length ? posts[posts.length - 1]!.posted_at : null;
-    repo.recordExport({ coveredUpto, rowCount: posts.length });
-    repo.markExported(posts.map(p => p.id), new Date().toISOString());
+    const jobId = exportMgr.start(parsed.data);
+    res.status(202).json({ jobId });
+  });
+
+  router.get('/reports/export/:jobId', auth, (req: Request, res: Response) => {
+    const status = exportMgr.get(req.params.jobId as string);
+    if (!status) { res.status(404).json({ error: 'not found' }); return; }
+    res.json(status);
+  });
+
+  router.get('/reports/export/:jobId/download', auth, (req: Request, res: Response) => {
+    const zip = exportMgr.takeZip(req.params.jobId as string);
+    if (!zip) { res.status(404).json({ error: 'not ready' }); return; }
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.zip"');
     res.send(zip);
