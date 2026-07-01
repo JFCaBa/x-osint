@@ -22,6 +22,10 @@ keeps the local model saturated (see "Classify robustness fix" below).
 2. Rename the button to reflect that it exports a full report (zip), not just Excel.
 3. Fix the classify bug so the model isn't perpetually saturated, letting summaries
    complete quickly.
+4. Strip URLs from text before classify/summarize, so the model stops mis-tagging
+   posts based on link tokens (e.g. a black-holes science post from The Economist
+   getting tagged *economy*/*business* because its URL is `economist.com`). Applies to
+   newly classified/summarized posts only — no bulk reclassification of existing posts.
 
 ## Why a job model
 
@@ -57,6 +61,30 @@ const classifySchema = z.object({ angles: z.array(z.string()).optional() });
 
 This is a targeted fix for the observed ZodError. No behavior change for well-formed
 responses.
+
+### Strip URLs before classify/summarize (`packages/api/src/ai/ollama.ts`)
+
+The full post text — URL included — is currently sent to the model. Small models latch
+onto link tokens: a science post ("They make the universe's most extreme gravitational
+laboratories https://www.economist.com/.../black-holes?utm_campaign=trueanthem...") got
+tagged *economy* + *business* purely because the URL contains "economist". Fix: strip
+URLs from the text before it reaches the model.
+
+```ts
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+}
+```
+
+- `classify(text, labels)` sends `stripUrls(text)` as the user message.
+- `summarize(posts, tag)` maps each post text through `stripUrls` before numbering/joining.
+- `translate` is unchanged (it already ignores URLs and the stored/displayed text keeps
+  its links).
+
+Scope: this only changes what future `classify`/`summarize` calls see. The stored
+`post.text`, the report's post links, and already-classified posts are untouched — the
+improvement applies to new posts going forward (existing posts would only change via the
+existing "Re-classify all" button, which is out of scope here).
 
 ### Progress hook in `buildAnalysisMarkdown` (`packages/api/src/reports/analysis.ts`)
 
@@ -210,10 +238,15 @@ how the view already owns `busy`/`error` local refs. No new store state is neede
 
 ## Testing
 
-### `ollama.test.ts` (classify fix)
+### `ollama.test.ts` (classify fix + URL stripping)
 - A classify response where `match` is an array (previously threw) no longer throws and
   returns angles-based result (e.g. `{ match: true, angles: ['money'] }` for
   `angles: ['money']`).
+- `classify` sends the text with URLs removed: given a text containing
+  `https://www.economist.com/...`, the user message passed to `postJson` contains
+  neither `http` nor `economist.com` (assert via the mock's recorded call body).
+- `summarize` strips URLs from each post text: given a post containing a URL, the user
+  message passed to `postJson` contains no `http`.
 
 ### `analysis.test.ts` (progress hook)
 - `onProgress` is called once per tag with `phase: 'summarize'` then `phase:
