@@ -13,6 +13,7 @@ function mockProvider(over: Partial<AiProvider> = {}): AiProvider {
   return {
     classify: vi.fn(async (t: string, _labels: string[]) => ({ match: t.includes('1'), angles: t.includes('1') ? ['money'] : [] })),
     translate: vi.fn(async () => 'traduzido'),
+    summarize: vi.fn(async () => 'resumo'),
     ...over,
   };
 }

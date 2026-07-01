@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { type AiProvider, type ClassifyResult } from './provider.js';
 
 const TIMEOUT_MS = 30_000;
+const SUMMARIZE_TIMEOUT_MS = 120_000;
 
 export type PostJson = (url: string, body: unknown, timeoutMs: number)
   => Promise<{ ok: boolean; status: number; json: unknown }>;
@@ -53,6 +54,12 @@ const TRANSLATE_SYSTEM =
   'You are a translator. Translate the user message into European Portuguese. ' +
   'Output ONLY the translation, with no preamble, quotes, or notes.';
 
+function summarizeSystem(tag: string): string {
+  return 'You are an analyst. Write a concise 3 to 5 sentence analytical summary of the following '
+    + `social media posts related to "${tag}". Cover the main themes, notable developments, and overall `
+    + 'sentiment. Output ONLY the summary as plain prose — no preamble, no bullet points, no markdown headings.';
+}
+
 const classifySchema = z.object({
   match: z.boolean().optional(),
   angles: z.array(z.string()).optional(),
@@ -93,7 +100,7 @@ export class OllamaProvider implements AiProvider {
     return found;
   }
 
-  private async chat(system: string, user: string, json: boolean): Promise<string> {
+  private async chat(system: string, user: string, json: boolean, timeoutMs: number = TIMEOUT_MS): Promise<string> {
     const res = await this.postJson(`${this.host}/api/chat`, {
       model: this.model,
       stream: false,
@@ -102,7 +109,7 @@ export class OllamaProvider implements AiProvider {
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    }, TIMEOUT_MS);
+    }, timeoutMs);
     if (!res.ok) throw new Error(`ollama request failed: ${res.status}`);
     return messageSchema.parse(res.json).message.content;
   }
@@ -122,6 +129,12 @@ export class OllamaProvider implements AiProvider {
 
   async translate(text: string): Promise<string> {
     const content = await this.chat(TRANSLATE_SYSTEM, text, false);
+    return content.trim();
+  }
+
+  async summarize(posts: string[], tag: string): Promise<string> {
+    const user = posts.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const content = await this.chat(summarizeSystem(tag), user, false, SUMMARIZE_TIMEOUT_MS);
     return content.trim();
   }
 }

@@ -35,6 +35,7 @@ function main(): void {
     staticDir,
     aiAvailable: provider !== null,
     checkAiReady,
+    aiProvider: provider,
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, 'x-osint listening');

@@ -115,7 +115,7 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'x-osint-report.xlsx';
+    a.download = 'x-osint-report.zip';
     document.body.appendChild(a);
     a.click();
     a.remove();
