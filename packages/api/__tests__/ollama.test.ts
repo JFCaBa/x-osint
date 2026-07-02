@@ -128,3 +128,31 @@ describe('OllamaProvider.summarize', () => {
     expect((post as any).mock.calls[0][2]).toBe(30000);
   });
 });
+
+describe('OllamaProvider input hygiene', () => {
+  it('does not throw when the model returns match as an array', async () => {
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: stub(JSON.stringify({ match: ['money'], angles: ['money'] })) });
+    const r = await p.classify('quarterly earnings', ['money', 'business']);
+    expect(r).toEqual({ match: true, angles: ['money'] });
+  });
+
+  it('strips URLs from the text sent to classify', async () => {
+    const post = stub(JSON.stringify({ angles: [] }));
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await p.classify('black holes https://www.economist.com/science/black-holes?utm_campaign=x', ['economy']);
+    const userMsg = (post as any).mock.calls[0][1].messages[1].content as string;
+    expect(userMsg).not.toContain('http');
+    expect(userMsg).not.toContain('economist.com');
+    expect(userMsg).toContain('black holes');
+  });
+
+  it('strips URLs from each post text sent to summarize', async () => {
+    const post = stub('summary');
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await p.summarize(['see https://example.com/a?b=1 now'], 'money');
+    const userMsg = (post as any).mock.calls[0][1].messages[1].content as string;
+    expect(userMsg).not.toContain('http');
+    expect(userMsg).toContain('see');
+    expect(userMsg).toContain('now');
+  });
+});

@@ -141,3 +141,24 @@ describe('buildAnalysisMarkdown', () => {
     expect(md).not.toContain('_AI summary unavailable._');
   });
 });
+
+describe('buildAnalysisMarkdown onProgress', () => {
+  it('emits summarize then translate per tag with 1-based index and total', async () => {
+    const posts = [post({ id: '1', angles: 'money' }), post({ id: '2', angles: 'business' })];
+    const events: any[] = [];
+    await buildAnalysisMarkdown({ posts, filters: FILTERS, tz: 'UTC', provider: stubProvider(), onProgress: e => events.push(e) });
+    expect(events).toEqual([
+      { phase: 'summarize', tag: 'money', index: 1, total: 2 },
+      { phase: 'translate', tag: 'money', index: 1, total: 2 },
+      { phase: 'summarize', tag: 'business', index: 2, total: 2 },
+      { phase: 'translate', tag: 'business', index: 2, total: 2 },
+    ]);
+  });
+
+  it('does not emit translate for a tag whose summarize throws', async () => {
+    const provider = stubProvider({ summarize: vi.fn(async () => { throw new Error('down'); }) });
+    const events: any[] = [];
+    await buildAnalysisMarkdown({ posts: [post({ angles: 'money' })], filters: FILTERS, tz: 'UTC', provider, onProgress: e => events.push(e) });
+    expect(events).toEqual([{ phase: 'summarize', tag: 'money', index: 1, total: 1 }]);
+  });
+});

@@ -60,8 +60,11 @@ function summarizeSystem(tag: string): string {
     + 'sentiment. Output ONLY the summary as plain prose — no preamble, no bullet points, no markdown headings.';
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+}
+
 const classifySchema = z.object({
-  match: z.boolean().optional(),
   angles: z.array(z.string()).optional(),
 });
 
@@ -116,7 +119,7 @@ export class OllamaProvider implements AiProvider {
 
   async classify(text: string, labels: string[]): Promise<ClassifyResult> {
     if (labels.length === 0) return { match: false, angles: [] };
-    const content = await this.chat(classifySystem(labels), text, true);
+    const content = await this.chat(classifySystem(labels), stripUrls(text), true);
     const parsed = classifySchema.parse(JSON.parse(content));
     const canon = new Map(labels.map(l => [l.toLowerCase(), l]));
     const angles: string[] = [];
@@ -133,7 +136,7 @@ export class OllamaProvider implements AiProvider {
   }
 
   async summarize(posts: string[], tag: string): Promise<string> {
-    const user = posts.map((t, i) => `${i + 1}. ${t}`).join('\n');
+    const user = posts.map((t, i) => `${i + 1}. ${stripUrls(t)}`).join('\n');
     const content = await this.chat(summarizeSystem(tag), user, false, SUMMARIZE_TIMEOUT_MS);
     return content.trim();
   }

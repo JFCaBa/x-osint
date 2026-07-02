@@ -1,11 +1,19 @@
 import type { Post, Filter } from '../types.js';
 import type { AiProvider } from '../ai/provider.js';
 
+export interface AnalysisProgress {
+  phase: 'summarize' | 'translate';
+  tag: string;
+  index: number;
+  total: number;
+}
+
 export interface AnalysisDeps {
   posts: Post[];
   filters: Filter[];
   tz: string;
   provider: AiProvider | null;
+  onProgress?: (ev: AnalysisProgress) => void;
 }
 
 const MAX_KEY_POSTS = 5;
@@ -65,8 +73,10 @@ function statsLine(group: Post[], tz: string, accountsWord: string): string {
 
 async function narratives(
   provider: AiProvider | null, texts: string[], label: string,
+  emit: (phase: 'summarize' | 'translate') => void,
 ): Promise<{ en: string; pt: string }> {
   if (!provider) return { en: EN_UNAVAIL, pt: PT_UNAVAIL };
+  emit('summarize');
   let en: string;
   try {
     en = (await provider.summarize(texts.slice(0, MAX_SUMMARY_INPUT), label)).trim() || EN_UNAVAIL;
@@ -74,6 +84,7 @@ async function narratives(
     return { en: EN_UNAVAIL, pt: PT_UNAVAIL };
   }
   if (en === EN_UNAVAIL) return { en, pt: PT_UNAVAIL };
+  emit('translate');
   let pt: string;
   try {
     pt = (await provider.translate(en)).trim() || PT_UNAVAIL;
@@ -106,8 +117,11 @@ export async function buildAnalysisMarkdown(deps: AnalysisDeps): Promise<string>
   if (tags.length === 0) tags = [{ label: 'All posts', group: posts }];
 
   const blocks: TagBlock[] = [];
-  for (const t of tags) {
-    const { en, pt } = await narratives(provider, t.group.map(p => p.text), t.label);
+  for (let i = 0; i < tags.length; i++) {
+    const t = tags[i]!;
+    const emit = (phase: 'summarize' | 'translate'): void =>
+      deps.onProgress?.({ phase, tag: t.label, index: i + 1, total: tags.length });
+    const { en, pt } = await narratives(provider, t.group.map(p => p.text), t.label, emit);
     blocks.push({ label: t.label, group: t.group, en, pt });
   }
 
