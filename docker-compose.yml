@@ -20,10 +20,12 @@ services:
       - x-data:/data
     restart: unless-stopped
 
-  # --- cpu profile: bundled Ollama, CPU-only (portable default) ---
+  # --- default backend: bundled Ollama, CPU-only ---
+  # No profile, so a plain `docker compose up` brings up the full CPU stack
+  # (app + Ollama + model pull) exactly as before. `make metal` / `make gpu`
+  # exclude these with `--scale ollama=0 --scale ollama-pull=0`.
   ollama:
     image: ollama/ollama:latest
-    profiles: ["cpu"]
     volumes:
       - ollama-models:/root/.ollama
     ports:
@@ -32,7 +34,6 @@ services:
   # One-shot: pulls both models into the shared volume on `up`, then exits.
   ollama-pull:
     image: ollama/ollama:latest
-    profiles: ["cpu"]
     depends_on:
       - ollama
     environment:

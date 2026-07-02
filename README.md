@@ -7,20 +7,21 @@ Self-hosted collector for X/Twitter accounts. Pulls posts from a watchlist via N
 
 ### Choosing an inference backend (metal / cpu / gpu)
 
-The app talks to Ollama; a `Makefile` selects **where Ollama runs** and launches the app
-against it:
+The default is self-contained — **`docker compose up -d --build` still brings up the full
+CPU stack** (app + Ollama + a one-shot model pull), exactly as before. A `Makefile` adds
+faster backends on top:
 
 ```bash
-make cpu      # bundled container Ollama, CPU-only — portable, works anywhere
+docker compose up -d --build   # or: make cpu — bundled container Ollama (CPU), works anywhere
 make metal    # native host Ollama on the Apple Metal GPU (macOS) — fast
 make gpu      # bundled container Ollama with NVIDIA passthrough — Linux + NVIDIA hosts
 make down     # stop everything
 make logs     # tail the app logs
 ```
 
-- **`make cpu`** is the self-contained default: it also starts a one-shot `ollama-pull`
-  that downloads the models (`gemma3:4b` ~3 GB) into a named volume. First boot is slow
-  (image build + model download); later runs are cached.
+- **`make cpu`** (or a plain `docker compose up`) is the self-contained default: it also
+  starts a one-shot `ollama-pull` that downloads the models (`gemma3:4b` ~3 GB) into a
+  named volume. First boot is slow (image build + model download); later runs are cached.
 - **`make metal`** runs the app alone, pointing at a **native** Ollama on the host so
   inference uses the Apple Metal GPU (dramatically faster than CPU). Set it up once:
   ```bash
