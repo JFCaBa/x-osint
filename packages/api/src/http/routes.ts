@@ -8,6 +8,7 @@ import { buildWorkbookBuffer } from '../reports/excel.js';
 import { buildAnalysisMarkdown } from '../reports/analysis.js';
 import { zipReport } from '../reports/zip.js';
 import type { AiProvider } from '../ai/provider.js';
+import type { AiActivity } from '../ai/processor.js';
 import { createExportManager } from './exportJobs.js';
 
 type Repo = ReturnType<typeof createRepo>;
@@ -45,6 +46,7 @@ export function createRoutes(
   aiAvailable = false,
   checkAiReady: () => Promise<boolean> = async () => false,
   aiProvider: AiProvider | null = null,
+  getAiActivity: () => AiActivity | null = () => null,
 ): Router {
   const router = Router();
   const auth = makeAuthMiddleware(config.tokenSecret);
@@ -64,6 +66,11 @@ export function createRoutes(
     const model = configured ? config.aiModel : null;
     const ready = configured ? await checkAiReady() : false;
     res.json({ configured, model, ready });
+  });
+
+  router.get('/ai/queue', auth, (_req: Request, res: Response) => {
+    const current = getAiActivity();
+    res.json({ pending: repo.countPostsNeedingAi(), processing: current !== null, current });
   });
 
   router.post('/login', (req: Request, res: Response) => {

@@ -14,7 +14,7 @@ import { openDb } from '../src/store/db.js';
 import { createRepo } from '../src/store/repo.js';
 import { loadConfig } from '../src/config.js';
 
-function setup(opts: { aiAvailable?: boolean; checkAiReady?: () => Promise<boolean> } = {}) {
+function setup(opts: { aiAvailable?: boolean; checkAiReady?: () => Promise<boolean>; getAiActivity?: () => { handle: string; phase: 'classify' | 'translate' } | null } = {}) {
   const config = loadConfig({ X_OSINT_PASSWORD: 'pw' });
   const repo = createRepo(openDb(':memory:'));
   const triggerFetch = vi.fn();
@@ -22,6 +22,7 @@ function setup(opts: { aiAvailable?: boolean; checkAiReady?: () => Promise<boole
     config, repo, triggerFetch,
     aiAvailable: opts.aiAvailable ?? true,
     checkAiReady: opts.checkAiReady,
+    getAiActivity: opts.getAiActivity,
   });
   return { app, repo, triggerFetch };
 }
@@ -298,5 +299,31 @@ describe('ai status route', () => {
     const token = await tokenFor(ctx.app);
     const res = await request(ctx.app).get('/api/ai/status').set('Authorization', `Bearer ${token}`);
     expect(res.body).toEqual({ configured: false, model: null, ready: false });
+  });
+});
+
+describe('ai queue route', () => {
+  it('requires auth', async () => {
+    const { app } = setup();
+    expect((await request(app).get('/api/ai/queue')).status).toBe(401);
+  });
+
+  it('reports pending backlog and idle when nothing is processing', async () => {
+    const ctx = setup();
+    ctx.repo.upsertPosts([
+      { id: '1', handle: 'alice', text: 't', url: null, media_url: null, posted_at: '2026-06-18T00:00:00.000Z', fetched_at: '2026-06-18T00:00:00.000Z' },
+      { id: '2', handle: 'bob', text: 't', url: null, media_url: null, posted_at: '2026-06-18T00:00:00.000Z', fetched_at: '2026-06-18T00:00:00.000Z' },
+    ]);
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/ai/queue').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ pending: 2, processing: false, current: null });
+  });
+
+  it('reports the current item when processing', async () => {
+    const ctx = setup({ getAiActivity: () => ({ handle: 'alice', phase: 'classify' }) });
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).get('/api/ai/queue').set('Authorization', `Bearer ${token}`);
+    expect(res.body).toEqual({ pending: 0, processing: true, current: { handle: 'alice', phase: 'classify' } });
   });
 });
