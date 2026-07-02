@@ -38,6 +38,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   const aiProvider = aiProviderRaw;
 
+  const aiModel = env.AI_MODEL?.trim() || 'gemma3:4b';
+  const summarizeModel = env.AI_SUMMARIZE_MODEL?.trim() || aiModel;
+
   return {
     password,
     port: num(env.PORT, 8080),
@@ -49,7 +52,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     nitterInstances,
     aiProvider,
     ollamaHost: env.OLLAMA_HOST?.trim() || 'http://localhost:11434',
-    aiModel: env.AI_MODEL?.trim() || 'gemma3:4b',
+    aiModel,
+    summarizeModel,
     reportTz: env.REPORT_TZ?.trim() || 'Europe/London',
   };
 }

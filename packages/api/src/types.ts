@@ -45,5 +45,6 @@ export interface Config {
   aiProvider: 'ollama' | 'none';
   ollamaHost: string;
   aiModel: string;
+  summarizeModel: string;
   reportTz: string;
 }
