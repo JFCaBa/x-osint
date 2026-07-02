@@ -51,6 +51,12 @@ export interface AiStatus {
   ready: boolean;
 }
 
+export interface AiQueue {
+  pending: number;
+  processing: boolean;
+  current: { handle: string; phase: 'classify' | 'translate' } | null;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -141,4 +147,5 @@ export const api = {
   saveSettings(filters: Filter[]): Promise<{ filters: Filter[] }> { return call<{ filters: Filter[] }>('PUT', '/settings', { filters }); },
   reclassifyAll(): Promise<{ queued: number }> { return call<{ queued: number }>('POST', '/settings/reclassify'); },
   aiStatus(): Promise<AiStatus> { return call<AiStatus>('GET', '/ai/status'); },
+  aiQueue(): Promise<AiQueue> { return call<AiQueue>('GET', '/ai/queue'); },
 };
