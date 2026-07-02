@@ -5,19 +5,43 @@ Self-hosted collector for X/Twitter accounts. Pulls posts from a watchlist via N
 
 ## Run with Docker
 
-### Recommended: Compose (full stack, with AI)
+### Choosing an inference backend (metal / cpu / gpu)
+
+The app talks to Ollama; a `Makefile` selects **where Ollama runs** and launches the app
+against it:
 
 ```bash
-X_OSINT_PASSWORD=yourpassword docker compose up -d --build
+make cpu      # bundled container Ollama, CPU-only — portable, works anywhere
+make metal    # native host Ollama on the Apple Metal GPU (macOS) — fast
+make gpu      # bundled container Ollama with NVIDIA passthrough — Linux + NVIDIA hosts
+make down     # stop everything
+make logs     # tail the app logs
 ```
 
-This brings up the app **plus** Ollama and a one-shot `ollama-pull` service that downloads
-the AI model for you. The command is the same on every run; only the **first boot is slow**
-because it builds the image and downloads the `gemma3:4b` model (~3 GB). After that, the
-image is cached and the model persists in a named volume, so restarts are fast.
+- **`make cpu`** is the self-contained default: it also starts a one-shot `ollama-pull`
+  that downloads the models (`gemma3:4b` ~3 GB) into a named volume. First boot is slow
+  (image build + model download); later runs are cached.
+- **`make metal`** runs the app alone, pointing at a **native** Ollama on the host so
+  inference uses the Apple Metal GPU (dramatically faster than CPU). Set it up once:
+  ```bash
+  make native-ollama   # brew install ollama + pull the models onto the host
+  ```
+  Native Ollama listens on `0.0.0.0:11434` (so the container can reach it via
+  `host.docker.internal`) and stores models in `~/.ollama` (separate from the container
+  volume).
+- **`make gpu`** is for a Linux host with an NVIDIA GPU + `nvidia-container-toolkit`. It
+  **does not work on macOS** (Docker cannot pass the Metal GPU into a Linux container) —
+  use `make metal` on a Mac.
 
-> After a `git pull`, keep the `--build` flag so Compose rebuilds the image with the new
-> code (otherwise it may reuse a stale image).
+Set your login password and model in a local `.env` (auto-loaded by Compose), e.g.:
+
+```bash
+X_OSINT_PASSWORD=yourpassword
+AI_MODEL=gemma3:1b            # fast per-post model (classify + translate)
+AI_SUMMARIZE_MODEL=gemma3:4b  # quality model for report summaries
+```
+
+> After a `git pull`, the `make` targets pass `--build` so Compose rebuilds the image.
 
 ### Collector only (single container, no AI)
 
