@@ -34,7 +34,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
       AI_MODEL: ${AI_MODEL:-gemma3:4b}
       AI_SUMMARIZE_MODEL: ${AI_SUMMARIZE_MODEL:-gemma3:4b}
-    entrypoint: ["/bin/sh", "-c", "ollama pull \"$AI_MODEL\" && ollama pull \"$AI_SUMMARIZE_MODEL\""]
+    entrypoint: ["/bin/sh", "-c", "ollama pull \"$$AI_MODEL\" && ollama pull \"$$AI_SUMMARIZE_MODEL\""]
     restart: "no"
 
 volumes:
