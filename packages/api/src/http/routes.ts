@@ -35,6 +35,7 @@ const reportParamsSchema = z.object({
   mode: z.enum(['since-last', 'range']).default('since-last'),
   from: z.string().optional(),
   to: z.string().optional(),
+  include: z.enum(['both', 'excel', 'report']).default('both'),
 });
 
 export function createRoutes(
@@ -148,11 +149,11 @@ export function createRoutes(
   });
 
   router.get('/reports/export/:jobId/download', auth, (req: Request, res: Response) => {
-    const zip = exportMgr.takeZip(req.params.jobId as string);
-    if (!zip) { res.status(404).json({ error: 'not ready' }); return; }
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="x-osint-report.zip"');
-    res.send(zip);
+    const f = exportMgr.takeFile(req.params.jobId as string);
+    if (!f) { res.status(404).json({ error: 'not ready' }); return; }
+    res.setHeader('Content-Type', f.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${f.filename}"`);
+    res.send(f.buffer);
   });
 
   router.get('/settings', auth, (_req: Request, res: Response) => {

@@ -169,6 +169,39 @@ describe('reports routes', () => {
     const only = await auth(request(ctx.app).get('/api/posts?angleOnly=true'));
     expect(only.body.map((p: { id: string }) => p.id)).toEqual(['1']);
   });
+
+  it('include=excel downloads a bare xlsx', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    await seedMatch('1', '2026-06-18T00:00:00.000Z');
+    const { jobId, status } = await runExport(ctx.app, token, { mode: 'since-last', include: 'excel' });
+    expect(status.status).toBe('done');
+    const dl = await auth(request(ctx.app).get(`/api/reports/export/${jobId}/download`));
+    expect(dl.status).toBe(200);
+    expect(dl.headers['content-type']).toContain('spreadsheetml');
+    expect(dl.headers['content-disposition']).toContain('x-osint-report.xlsx');
+  });
+
+  it('include=report downloads a bare markdown file', async () => {
+    const token = await tokenFor(ctx.app);
+    const auth = (r: request.Test) => r.set('Authorization', `Bearer ${token}`);
+    await seedMatch('1', '2026-06-18T00:00:00.000Z');
+    const { jobId, status } = await runExport(ctx.app, token, { mode: 'since-last', include: 'report' });
+    expect(status.status).toBe('done');
+    const dl = await auth(request(ctx.app).get(`/api/reports/export/${jobId}/download`));
+    expect(dl.status).toBe(200);
+    expect(dl.headers['content-type']).toContain('text/markdown');
+    expect(dl.headers['content-disposition']).toContain('x-osint-analysis.md');
+    expect(dl.text).toContain('# Analysis (English)');
+  });
+
+  it('rejects an invalid include value', async () => {
+    const token = await tokenFor(ctx.app);
+    const res = await request(ctx.app).post('/api/reports/export')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ mode: 'since-last', include: 'nonsense' });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('posts angle filter route', () => {

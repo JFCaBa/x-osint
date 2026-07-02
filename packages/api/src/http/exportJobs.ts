@@ -6,7 +6,7 @@ import type { Post } from '../types.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
-export type ReportParams = { mode: 'since-last' | 'range'; from?: string; to?: string };
+export type ReportParams = { mode: 'since-last' | 'range'; from?: string; to?: string; include?: 'both' | 'excel' | 'report' };
 
 type Phase = 'spreadsheet' | 'summarize' | 'translate' | 'bundling' | 'done' | 'error';
 
@@ -17,7 +17,9 @@ interface ExportJob {
   tag: string | null;
   index: number;
   total: number;
-  zip: Buffer | null;
+  file: Buffer | null;
+  filename: string;
+  contentType: string;
   error: string | null;
   createdAt: number;
   promise?: Promise<void>;
@@ -44,11 +46,12 @@ export interface ExportManagerDeps {
 export interface ExportManager {
   start(params: ReportParams): string;
   get(jobId: string): PublicStatus | undefined;
-  takeZip(jobId: string): Buffer | null;
+  takeFile(jobId: string): { buffer: Buffer; filename: string; contentType: string } | null;
   whenDone(jobId: string): Promise<void>;
 }
 
 const TTL_MS = 10 * 60_000;
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 export function createExportManager(deps: ExportManagerDeps): ExportManager {
   const jobs = new Map<string, ExportJob>();
@@ -62,27 +65,48 @@ export function createExportManager(deps: ExportManagerDeps): ExportManager {
 
   async function run(job: ExportJob, params: ReportParams): Promise<void> {
     try {
+      const include = params.include ?? 'both';
       const posts = deps.repo.listExportablePosts(params);
-      const xlsx = await deps.buildWorkbook(posts, deps.tz);
-      const markdown = await deps.buildMarkdown({
-        posts,
-        filters: deps.repo.getFilters(),
-        tz: deps.tz,
-        provider: deps.provider,
-        onProgress: (ev) => {
-          job.phase = ev.phase;
-          job.tag = ev.tag;
-          job.index = ev.index;
-          job.total = ev.total;
-        },
-      });
-      job.phase = 'bundling';
-      job.tag = null;
-      const zip = await deps.zip({ xlsx, markdown });
+      let xlsx: Buffer | undefined;
+      let markdown: string | undefined;
+      if (include !== 'report') {
+        job.phase = 'spreadsheet';
+        xlsx = await deps.buildWorkbook(posts, deps.tz);
+      }
+      if (include !== 'excel') {
+        markdown = await deps.buildMarkdown({
+          posts,
+          filters: deps.repo.getFilters(),
+          tz: deps.tz,
+          provider: deps.provider,
+          onProgress: (ev) => {
+            job.phase = ev.phase;
+            job.tag = ev.tag;
+            job.index = ev.index;
+            job.total = ev.total;
+          },
+        });
+      }
+      let file: Buffer;
+      if (include === 'excel') {
+        file = xlsx!;
+        job.filename = 'x-osint-report.xlsx';
+        job.contentType = XLSX_TYPE;
+      } else if (include === 'report') {
+        file = Buffer.from(markdown!, 'utf8');
+        job.filename = 'x-osint-analysis.md';
+        job.contentType = 'text/markdown; charset=utf-8';
+      } else {
+        job.phase = 'bundling';
+        job.tag = null;
+        file = await deps.zip({ xlsx: xlsx!, markdown: markdown! });
+        job.filename = 'x-osint-report.zip';
+        job.contentType = 'application/zip';
+      }
       const coveredUpto = posts.length ? posts[posts.length - 1]!.posted_at : null;
       deps.repo.recordExport({ coveredUpto, rowCount: posts.length });
       deps.repo.markExported(posts.map(p => p.id), new Date().toISOString());
-      job.zip = zip;
+      job.file = file;
       job.status = 'done';
       job.phase = 'done';
     } catch (err) {
@@ -102,7 +126,9 @@ export function createExportManager(deps: ExportManagerDeps): ExportManager {
         tag: null,
         index: 0,
         total: 0,
-        zip: null,
+        file: null,
+        filename: '',
+        contentType: '',
         error: null,
         createdAt: Date.now(),
       };
@@ -115,11 +141,11 @@ export function createExportManager(deps: ExportManagerDeps): ExportManager {
       if (!j) return undefined;
       return { status: j.status, phase: j.phase, tag: j.tag, index: j.index, total: j.total, error: j.error };
     },
-    takeZip(jobId: string): Buffer | null {
+    takeFile(jobId: string): { buffer: Buffer; filename: string; contentType: string } | null {
       const j = jobs.get(jobId);
-      if (!j || j.status !== 'done' || !j.zip) return null;
+      if (!j || j.status !== 'done' || !j.file) return null;
       jobs.delete(jobId);
-      return j.zip;
+      return { buffer: j.file, filename: j.filename, contentType: j.contentType };
     },
     whenDone(jobId: string): Promise<void> {
       return jobs.get(jobId)?.promise ?? Promise.resolve();
