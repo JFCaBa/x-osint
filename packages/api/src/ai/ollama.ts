@@ -3,6 +3,7 @@ import { type AiProvider, type ClassifyResult } from './provider.js';
 
 const TIMEOUT_MS = 30_000;
 const SUMMARIZE_TIMEOUT_MS = 120_000;
+const CLASSIFY_TIMEOUT_MS = 120_000;
 
 export type PostJson = (url: string, body: unknown, timeoutMs: number)
   => Promise<{ ok: boolean; status: number; json: unknown }>;
@@ -119,7 +120,7 @@ export class OllamaProvider implements AiProvider {
 
   async classify(text: string, labels: string[]): Promise<ClassifyResult> {
     if (labels.length === 0) return { match: false, angles: [] };
-    const content = await this.chat(classifySystem(labels), stripUrls(text), true);
+    const content = await this.chat(classifySystem(labels), stripUrls(text), true, CLASSIFY_TIMEOUT_MS);
     const parsed = classifySchema.parse(JSON.parse(content));
     const canon = new Map(labels.map(l => [l.toLowerCase(), l]));
     const angles: string[] = [];

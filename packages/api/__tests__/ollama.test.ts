@@ -121,11 +121,18 @@ describe('OllamaProvider.summarize', () => {
     expect((post as any).mock.calls[0][2]).toBe(120000);
   });
 
-  it('does not affect the default 30s timeout used by classify/translate', async () => {
+  it('keeps the default 30s timeout for translate', async () => {
     const post = stub('  Olá mundo  ');
     const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
     await p.translate('Hello world');
     expect((post as any).mock.calls[0][2]).toBe(30000);
+  });
+
+  it('uses a 120s timeout for classify (slow/cold local model)', async () => {
+    const post = stub(JSON.stringify({ angles: [] }));
+    const p = new OllamaProvider({ host: 'http://x', model: 'm', postJson: post });
+    await p.classify('some text', ['money']);
+    expect((post as any).mock.calls[0][2]).toBe(120000);
   });
 });
 
