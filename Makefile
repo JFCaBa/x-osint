@@ -16,6 +16,9 @@ COMPOSE = docker compose
 # profile is left running when switching modes.
 DOWN_ALL = $(COMPOSE) --profile cpu --profile gpu down --remove-orphans
 
+# Bare `make` (no target) runs the portable CPU backend.
+.DEFAULT_GOAL := cpu
+
 .PHONY: metal cpu gpu native-ollama down logs help
 
 metal: ## App uses native host Ollama (Apple Metal GPU). Run `make native-ollama` first.
