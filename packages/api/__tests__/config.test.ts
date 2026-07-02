@@ -42,6 +42,24 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ X_OSINT_PASSWORD: 'pw', NITTER_INSTANCES: '[{"url":"bad","userAgent":""}]' }))
       .toThrow(/NITTER_INSTANCES/);
   });
+
+  it('defaults summarizeModel to aiModel when AI_SUMMARIZE_MODEL is unset', () => {
+    const cfg = loadConfig({ X_OSINT_PASSWORD: 'pw' });
+    expect(cfg.aiModel).toBe('gemma3:4b');
+    expect(cfg.summarizeModel).toBe('gemma3:4b');
+  });
+
+  it('falls summarizeModel back to a custom AI_MODEL when AI_SUMMARIZE_MODEL is unset', () => {
+    const cfg = loadConfig({ X_OSINT_PASSWORD: 'pw', AI_MODEL: 'gemma3:1b' });
+    expect(cfg.aiModel).toBe('gemma3:1b');
+    expect(cfg.summarizeModel).toBe('gemma3:1b');
+  });
+
+  it('uses AI_SUMMARIZE_MODEL when set, independent of AI_MODEL', () => {
+    const cfg = loadConfig({ X_OSINT_PASSWORD: 'pw', AI_MODEL: 'gemma3:1b', AI_SUMMARIZE_MODEL: 'gemma3:4b' });
+    expect(cfg.aiModel).toBe('gemma3:1b');
+    expect(cfg.summarizeModel).toBe('gemma3:4b');
+  });
 });
 
 describe('config AI defaults', () => {

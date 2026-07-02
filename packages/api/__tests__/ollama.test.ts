@@ -163,3 +163,31 @@ describe('OllamaProvider input hygiene', () => {
     expect(userMsg).toContain('now');
   });
 });
+
+describe('OllamaProvider per-operation model', () => {
+  it('summarize uses the summarize model in the request body', async () => {
+    const post = stub('a summary');
+    const p = new OllamaProvider({ host: 'http://x', model: 'fast', summarizeModel: 'quality', postJson: post });
+    await p.summarize(['post one'], 'money');
+    expect((post as any).mock.calls[0][1].model).toBe('quality');
+  });
+
+  it('classify and translate use the primary (fast) model, not the summarize model', async () => {
+    const post = stub(JSON.stringify({ angles: [] }));
+    const p = new OllamaProvider({ host: 'http://x', model: 'fast', summarizeModel: 'quality', postJson: post });
+    await p.classify('text', ['money']);
+    expect((post as any).mock.calls[0][1].model).toBe('fast');
+
+    const post2 = stub('olá');
+    const p2 = new OllamaProvider({ host: 'http://x', model: 'fast', summarizeModel: 'quality', postJson: post2 });
+    await p2.translate('hello');
+    expect((post2 as any).mock.calls[0][1].model).toBe('fast');
+  });
+
+  it('summarizeModel defaults to the primary model when omitted', async () => {
+    const post = stub('a summary');
+    const p = new OllamaProvider({ host: 'http://x', model: 'only', postJson: post });
+    await p.summarize(['x'], 'money');
+    expect((post as any).mock.calls[0][1].model).toBe('only');
+  });
+});

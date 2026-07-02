@@ -4,5 +4,9 @@ import { OllamaProvider } from './ollama.js';
 
 export function createAiProvider(config: Config): AiProvider | null {
   if (config.aiProvider === 'none') return null;
-  return new OllamaProvider({ host: config.ollamaHost, model: config.aiModel });
+  return new OllamaProvider({
+    host: config.ollamaHost,
+    model: config.aiModel,
+    summarizeModel: config.summarizeModel,
+  });
 }

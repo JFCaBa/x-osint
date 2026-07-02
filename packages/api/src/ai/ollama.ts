@@ -76,13 +76,15 @@ const tagsSchema = z.object({ models: z.array(z.object({ name: z.string() })) })
 export class OllamaProvider implements AiProvider {
   private host: string;
   private model: string;
+  private summarizeModel: string;
   private postJson: PostJson;
   private getJson: GetJson;
   private readyCache = false;
 
-  constructor(deps: { host: string; model: string; postJson?: PostJson; getJson?: GetJson }) {
+  constructor(deps: { host: string; model: string; summarizeModel?: string; postJson?: PostJson; getJson?: GetJson }) {
     this.host = deps.host.replace(/\/$/, '');
     this.model = deps.model;
+    this.summarizeModel = deps.summarizeModel ?? deps.model;
     this.postJson = deps.postJson ?? defaultPostJson;
     this.getJson = deps.getJson ?? defaultGetJson;
   }
@@ -104,9 +106,9 @@ export class OllamaProvider implements AiProvider {
     return found;
   }
 
-  private async chat(system: string, user: string, json: boolean, timeoutMs: number = TIMEOUT_MS): Promise<string> {
+  private async chat(system: string, user: string, json: boolean, timeoutMs: number = TIMEOUT_MS, model: string = this.model): Promise<string> {
     const res = await this.postJson(`${this.host}/api/chat`, {
-      model: this.model,
+      model,
       stream: false,
       ...(json ? { format: 'json' } : {}),
       messages: [
@@ -138,7 +140,7 @@ export class OllamaProvider implements AiProvider {
 
   async summarize(posts: string[], tag: string): Promise<string> {
     const user = posts.map((t, i) => `${i + 1}. ${stripUrls(t)}`).join('\n');
-    const content = await this.chat(summarizeSystem(tag), user, false, SUMMARIZE_TIMEOUT_MS);
+    const content = await this.chat(summarizeSystem(tag), user, false, SUMMARIZE_TIMEOUT_MS, this.summarizeModel);
     return content.trim();
   }
 }
