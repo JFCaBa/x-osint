@@ -74,4 +74,34 @@ describe('aiProcessor', () => {
     await proc.processAll(); // must not hang
     expect(repo.listPosts({}).every(p => p.ai_status === 'error')).toBe(true);
   });
+
+  it('reports activity: classify then translate per match, classify-only for non-match, null at end', async () => {
+    const repo = createRepo(openDb(':memory:'));
+    repo.upsertPosts([makePost('1'), makePost('2')]); // '1' matches, '2' does not
+    // Both posts share the same posted_at, so listPostsNeedingAi's tie-break order
+    // (not insertion order) determines processing order — derive it the same way
+    // processBatch does, rather than assuming '1' is processed before '2'.
+    const order = repo.listPostsNeedingAi(10).map(p => p.id);
+    const events: Array<{ handle: string; phase: string } | null> = [];
+    const proc = createAiProcessor({ repo, provider: mockProvider(), onActivity: (a) => events.push(a) });
+    await proc.processBatch();
+    const expected: Array<{ handle: string; phase: string } | null> = order.flatMap(id =>
+      id === '1'
+        ? [{ handle: 'h', phase: 'classify' }, { handle: 'h', phase: 'translate' }]
+        : [{ handle: 'h', phase: 'classify' }],
+    );
+    expected.push(null);
+    expect(events).toEqual(expected);
+  });
+
+  it('still emits null (idle) when a classify call throws', async () => {
+    const repo = createRepo(openDb(':memory:'));
+    repo.upsertPosts([makePost('1')]);
+    const events: Array<{ handle: string; phase: string } | null> = [];
+    const provider = mockProvider({ classify: vi.fn(async () => { throw new Error('down'); }) });
+    const proc = createAiProcessor({ repo, provider, onActivity: (a) => events.push(a) });
+    await proc.processBatch();
+    expect(events[0]).toEqual({ handle: 'h', phase: 'classify' });
+    expect(events[events.length - 1]).toBeNull();
+  });
 });

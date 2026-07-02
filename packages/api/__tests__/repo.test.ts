@@ -63,6 +63,19 @@ describe('repo', () => {
     expect(removed).toBe(1);
     expect(repo.listPosts({}).map(p => p.id)).toEqual(['new']);
   });
+
+  it('counts posts needing AI (null/pending/error), excluding done', () => {
+    repo.upsertPosts([
+      makePost('1', 'a', '2026-06-18T00:00:00.000Z'),
+      makePost('2', 'a', '2026-06-18T00:00:00.000Z'),
+      makePost('3', 'a', '2026-06-18T00:00:00.000Z'),
+    ]);
+    repo.setPostAi('1', { status: 'done', match: false, angles: [] }); // done → excluded
+    repo.setPostAi('2', { status: 'error' });                          // error → counted
+    // '3' stays null → counted
+    expect(repo.countPostsNeedingAi()).toBe(2);
+    expect(repo.countPostsNeedingAi()).toBe(repo.listPostsNeedingAi(1000).length);
+  });
 });
 
 describe('repo AI + exports', () => {
