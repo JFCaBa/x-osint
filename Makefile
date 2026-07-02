@@ -12,23 +12,26 @@
 # AI_MODEL / AI_SUMMARIZE_MODEL come from .env (Compose auto-loads it); default gemma3:4b.
 
 COMPOSE = docker compose
+# `down` must name every profile, otherwise a backend started under a different
+# profile is left running when switching modes.
+DOWN_ALL = $(COMPOSE) --profile cpu --profile gpu down --remove-orphans
 
 .PHONY: metal cpu gpu native-ollama down logs help
 
 metal: ## App uses native host Ollama (Apple Metal GPU). Run `make native-ollama` first.
-	$(COMPOSE) down --remove-orphans
+	$(DOWN_ALL)
 	OLLAMA_HOST=http://host.docker.internal:11434 $(COMPOSE) up -d --build
 
 cpu: ## App uses the bundled container Ollama (CPU).
-	$(COMPOSE) down --remove-orphans
+	$(DOWN_ALL)
 	OLLAMA_HOST=http://ollama:11434 $(COMPOSE) --profile cpu up -d --build
 
 gpu: ## App uses the bundled container Ollama (NVIDIA GPU; Linux hosts only).
-	$(COMPOSE) down --remove-orphans
+	$(DOWN_ALL)
 	OLLAMA_HOST=http://ollama-gpu:11434 $(COMPOSE) --profile gpu up -d --build
 
 down: ## Stop and remove all containers.
-	$(COMPOSE) --profile cpu --profile gpu down --remove-orphans
+	$(DOWN_ALL)
 
 logs: ## Tail the app logs.
 	$(COMPOSE) logs -f x-osint
