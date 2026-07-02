@@ -7,15 +7,17 @@ const data = useData();
 const mode = ref<'since-last' | 'range'>('since-last');
 const from = ref('');
 const to = ref('');
+const include = ref<'both' | 'excel' | 'report'>('both');
 const error = ref('');
 const busy = ref(false);
 const progress = ref<ExportStatus | null>(null);
 let timer: ReturnType<typeof setInterval> | null = null;
 
 function params(): ReportParams {
-  return mode.value === 'range'
+  const base: ReportParams = mode.value === 'range'
     ? { mode: 'range', from: from.value || undefined, to: to.value || undefined }
     : { mode: 'since-last' };
+  return { ...base, include: include.value };
 }
 
 async function refreshSummary(): Promise<void> {
@@ -97,6 +99,19 @@ onUnmounted(stopPolling);
         </label>
         <label class="flex items-center gap-1">
           <input type="radio" value="range" v-model="mode" @change="refreshSummary" name="report-mode" /> Date range
+        </label>
+      </div>
+
+      <div class="flex gap-4 text-sm">
+        <span class="text-gray-400">Include:</span>
+        <label class="flex items-center gap-1">
+          <input type="radio" value="both" v-model="include" name="report-include" /> Both
+        </label>
+        <label class="flex items-center gap-1">
+          <input type="radio" value="excel" v-model="include" name="report-include" /> Excel only
+        </label>
+        <label class="flex items-center gap-1">
+          <input type="radio" value="report" v-model="include" name="report-include" /> Report only
         </label>
       </div>
 

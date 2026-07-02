@@ -27,9 +27,11 @@ describe('createExportManager', () => {
     await mgr.whenDone(id);
     expect(mgr.get(id)!.status).toBe('done');
     expect(mgr.get(id)!.phase).toBe('done');
-    const zip = mgr.takeZip(id);
-    expect(zip).toEqual(Buffer.from('zipbytes'));
-    expect(mgr.takeZip(id)).toBeNull(); // job removed after first take
+    const f = mgr.takeFile(id);
+    expect(f!.buffer).toEqual(Buffer.from('zipbytes'));
+    expect(f!.filename).toBe('x-osint-report.zip');
+    expect(f!.contentType).toBe('application/zip');
+    expect(mgr.takeFile(id)).toBeNull(); // job removed after first take
     expect(mgr.get(id)).toBeUndefined();
     expect(d.repo.recordExport).toHaveBeenCalledOnce();
     expect(d.repo.markExported).toHaveBeenCalledOnce();
@@ -41,13 +43,13 @@ describe('createExportManager', () => {
     await mgr.whenDone(id);
     expect(mgr.get(id)!.status).toBe('error');
     expect(mgr.get(id)!.error).toBe('boom');
-    expect(mgr.takeZip(id)).toBeNull();
+    expect(mgr.takeFile(id)).toBeNull();
   });
 
   it('returns undefined/null for unknown ids', () => {
     const mgr = createExportManager(deps());
     expect(mgr.get('nope')).toBeUndefined();
-    expect(mgr.takeZip('nope')).toBeNull();
+    expect(mgr.takeFile('nope')).toBeNull();
   });
 
   it('threads onProgress from buildMarkdown into the status total/index', async () => {
@@ -60,5 +62,31 @@ describe('createExportManager', () => {
     await mgr.whenDone(id);
     // terminal phase is 'done'; total was captured during the run
     expect(mgr.get(id)!.status).toBe('done');
+  });
+
+  it('include=excel builds only the workbook, skips AI, and yields the xlsx', async () => {
+    const d = deps();
+    const mgr = createExportManager(d);
+    const id = mgr.start({ mode: 'since-last', include: 'excel' });
+    await mgr.whenDone(id);
+    const f = mgr.takeFile(id);
+    expect(f!.buffer).toEqual(Buffer.from('xlsx'));
+    expect(f!.filename).toBe('x-osint-report.xlsx');
+    expect(f!.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(d.buildMarkdown).not.toHaveBeenCalled(); // no AI work
+    expect(d.repo.recordExport).toHaveBeenCalledOnce();
+  });
+
+  it('include=report builds only the markdown and yields the .md', async () => {
+    const d = deps();
+    const mgr = createExportManager(d);
+    const id = mgr.start({ mode: 'since-last', include: 'report' });
+    await mgr.whenDone(id);
+    const f = mgr.takeFile(id);
+    expect(f!.buffer).toEqual(Buffer.from('# md', 'utf8'));
+    expect(f!.filename).toBe('x-osint-analysis.md');
+    expect(f!.contentType).toBe('text/markdown; charset=utf-8');
+    expect(d.buildWorkbook).not.toHaveBeenCalled();
+    expect(d.repo.recordExport).toHaveBeenCalledOnce();
   });
 });

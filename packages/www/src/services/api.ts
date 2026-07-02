@@ -28,6 +28,7 @@ export interface ReportParams {
   mode: 'since-last' | 'range';
   from?: string;
   to?: string;
+  include?: 'both' | 'excel' | 'report';
 }
 export interface ExportStatus {
   status: 'running' | 'done' | 'error';
@@ -124,10 +125,13 @@ export const api = {
     });
     if (!res.ok) throw new ApiError(res.status, 'download failed');
     const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const filename = match ? match[1]! : 'x-osint-report.zip';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'x-osint-report.zip';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
