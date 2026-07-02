@@ -33,10 +33,6 @@ export const useData = defineStore('data', () => {
   async function loadReportSummary(params: ReportParams): Promise<void> {
     reportSummary.value = await api.reportsSummary(params);
   }
-  async function exportReport(params: ReportParams): Promise<void> {
-    await api.exportReport(params);
-  }
-
   const filters = ref<Filter[]>([]);
   async function loadFilters(): Promise<void> { filters.value = (await api.getSettings()).filters; }
   async function saveFilters(next: Filter[]): Promise<void> { filters.value = (await api.saveSettings(next)).filters; }
@@ -45,7 +41,7 @@ export const useData = defineStore('data', () => {
   return {
     accounts, posts, loading, angleFilter, reportSummary,
     loadAccounts, addAccount, toggle, remove, loadPosts, refresh,
-    loadReportSummary, exportReport,
+    loadReportSummary,
     filters, loadFilters, saveFilters, reclassifyAll,
   };
 });

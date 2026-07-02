@@ -29,6 +29,14 @@ export interface ReportParams {
   from?: string;
   to?: string;
 }
+export interface ExportStatus {
+  status: 'running' | 'done' | 'error';
+  phase: string;
+  tag: string | null;
+  index: number;
+  total: number;
+  error: string | null;
+}
 
 export interface Filter {
   label: string;
@@ -104,13 +112,17 @@ export const api = {
     if (params.to) qs.set('to', params.to);
     return call<ReportSummary>('GET', `/reports/summary?${qs.toString()}`);
   },
-  async exportReport(params: ReportParams): Promise<void> {
-    const res = await fetch('/api/reports/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(params),
+  startExport(params: ReportParams): Promise<{ jobId: string }> {
+    return call<{ jobId: string }>('POST', '/reports/export', params);
+  },
+  exportStatus(jobId: string): Promise<ExportStatus> {
+    return call<ExportStatus>('GET', `/reports/export/${encodeURIComponent(jobId)}`);
+  },
+  async downloadExport(jobId: string): Promise<void> {
+    const res = await fetch(`/api/reports/export/${encodeURIComponent(jobId)}/download`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
-    if (!res.ok) throw new ApiError(res.status, 'export failed');
+    if (!res.ok) throw new ApiError(res.status, 'download failed');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
