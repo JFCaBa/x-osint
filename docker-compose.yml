@@ -8,30 +8,66 @@ services:
       X_OSINT_PASSWORD: "${X_OSINT_PASSWORD:-changeme}"
       POLL_INTERVAL_MIN: "5"
       RETENTION_DAYS: "30"
-      OLLAMA_HOST: http://ollama:11434
+      # Selected by the Makefile per backend:
+      #   metal -> http://host.docker.internal:11434 (native host Ollama, Apple Metal GPU)
+      #   cpu   -> http://ollama:11434                (bundled container, CPU)
+      #   gpu   -> http://ollama-gpu:11434            (bundled container, NVIDIA GPU)
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
       AI_MODEL: ${AI_MODEL:-gemma3:4b}
       AI_SUMMARIZE_MODEL: ${AI_SUMMARIZE_MODEL:-gemma3:4b}
       REPORT_TZ: ${REPORT_TZ:-Europe/London}
     volumes:
       - x-data:/data
     restart: unless-stopped
-    depends_on:
-      - ollama
+
+  # --- cpu profile: bundled Ollama, CPU-only (portable default) ---
   ollama:
     image: ollama/ollama:latest
+    profiles: ["cpu"]
     volumes:
       - ollama-models:/root/.ollama
     ports:
       - "11434:11434"
     restart: unless-stopped
-  # One-shot: pulls the model into the shared volume on `up`, then exits.
-  # The app keeps running meanwhile and starts classifying once the model lands.
+  # One-shot: pulls both models into the shared volume on `up`, then exits.
   ollama-pull:
     image: ollama/ollama:latest
+    profiles: ["cpu"]
     depends_on:
       - ollama
     environment:
       OLLAMA_HOST: http://ollama:11434
+      AI_MODEL: ${AI_MODEL:-gemma3:4b}
+      AI_SUMMARIZE_MODEL: ${AI_SUMMARIZE_MODEL:-gemma3:4b}
+    entrypoint: ["/bin/sh", "-c", "ollama pull \"$$AI_MODEL\" && ollama pull \"$$AI_SUMMARIZE_MODEL\""]
+    restart: "no"
+
+  # --- gpu profile: bundled Ollama with NVIDIA passthrough ---
+  # Requires a Linux host with an NVIDIA GPU + nvidia-container-toolkit.
+  # Does NOT work on macOS (Docker cannot pass the Metal GPU into a Linux container) —
+  # use the `metal` backend on Macs. Kept for portability to Linux + NVIDIA hosts.
+  ollama-gpu:
+    image: ollama/ollama:latest
+    profiles: ["gpu"]
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+  ollama-pull-gpu:
+    image: ollama/ollama:latest
+    profiles: ["gpu"]
+    depends_on:
+      - ollama-gpu
+    environment:
+      OLLAMA_HOST: http://ollama-gpu:11434
       AI_MODEL: ${AI_MODEL:-gemma3:4b}
       AI_SUMMARIZE_MODEL: ${AI_SUMMARIZE_MODEL:-gemma3:4b}
     entrypoint: ["/bin/sh", "-c", "ollama pull \"$$AI_MODEL\" && ollama pull \"$$AI_SUMMARIZE_MODEL\""]
