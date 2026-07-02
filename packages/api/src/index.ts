@@ -7,7 +7,7 @@ import { createRepo } from './store/repo.js';
 import { createScheduler } from './scheduler.js';
 import { createApp } from './http/app.js';
 import { createAiProvider } from './ai/factory.js';
-import { createAiProcessor } from './ai/processor.js';
+import { createAiProcessor, type AiActivity } from './ai/processor.js';
 import { logger } from './logger.js';
 
 function main(): void {
@@ -16,7 +16,8 @@ function main(): void {
   const db = openDb(join(config.dataDir, 'x-osint.db'));
   const repo = createRepo(db);
   const provider = createAiProvider(config);
-  const processor = provider ? createAiProcessor({ repo, provider }) : null;
+  let aiActivity: AiActivity | null = null;
+  const processor = provider ? createAiProcessor({ repo, provider, onActivity: (a) => { aiActivity = a; } }) : null;
   const scheduler = createScheduler({
     config, repo,
     aiProcess: processor ? () => processor.processAll() : undefined,
@@ -36,6 +37,7 @@ function main(): void {
     aiAvailable: provider !== null,
     checkAiReady,
     aiProvider: provider,
+    getAiActivity: () => aiActivity,
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, 'x-osint listening');

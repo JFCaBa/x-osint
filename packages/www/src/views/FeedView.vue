@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useData } from '../stores/data';
 import { badgeStyle } from '../services/badges';
-import type { Post, Filter } from '../services/api';
+import { api, type Post, type Filter, type AiQueue } from '../services/api';
 
 const data = useData();
 const search = ref('');
 const handleFilter = ref('');
+
+const aiQueue = ref<AiQueue | null>(null);
+let queueTimer: ReturnType<typeof setInterval> | null = null;
+async function pollQueue(): Promise<void> {
+  try { aiQueue.value = await api.aiQueue(); } catch { /* keep polling */ }
+}
+onMounted(() => { void pollQueue(); queueTimer = setInterval(() => { void pollQueue(); }, 3000); });
+onUnmounted(() => { if (queueTimer) { clearInterval(queueTimer); queueTimer = null; } });
 
 const filterByLabel = computed(() => {
   const m = new Map<string, Filter>();
@@ -57,6 +65,14 @@ async function refresh(): Promise<void> {
         <option v-for="f in data.filters" :key="f.label" :value="f.label">{{ f.emoji }} {{ f.label }}</option>
       </select>
       <button class="bg-cyan-600 hover:bg-cyan-500 rounded px-3 py-2 text-sm" @click="refresh">Refresh</button>
+    </div>
+
+    <div v-if="aiQueue && (aiQueue.pending > 0 || aiQueue.processing)"
+      class="text-xs text-gray-400 flex items-center gap-2">
+      <span>⚙ AI: {{ aiQueue.pending }} pending</span>
+      <span v-if="aiQueue.processing && aiQueue.current">
+        · @{{ aiQueue.current.handle }} — {{ aiQueue.current.phase === 'classify' ? 'classifying' : 'translating' }}…
+      </span>
     </div>
 
     <p v-if="data.loading" class="text-gray-500 text-sm">Loading…</p>

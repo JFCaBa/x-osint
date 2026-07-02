@@ -121,6 +121,14 @@ export function createRepo(db: Database.Database) {
       ).all(Math.max(1, Math.floor(limit))) as Post[];
     },
 
+    countPostsNeedingAi(): number {
+      const row = db.prepare(
+        `SELECT COUNT(*) AS c FROM posts
+         WHERE ai_status IS NULL OR ai_status = 'pending' OR ai_status = 'error'`,
+      ).get() as { c: number };
+      return row.c;
+    },
+
     setPostAi(id: string, v: { status: 'done' | 'error'; match?: boolean; angles?: string[]; textPt?: string | null }): void {
       db.prepare(
         `UPDATE posts SET ai_status = @status, angle_match = @match, angles = @angles, text_pt = @textPt WHERE id = @id`,

@@ -5,6 +5,7 @@ import type { Config } from '../types.js';
 import type { createRepo } from '../store/repo.js';
 import { createRoutes } from './routes.js';
 import type { AiProvider } from '../ai/provider.js';
+import type { AiActivity } from '../ai/processor.js';
 
 type Repo = ReturnType<typeof createRepo>;
 
@@ -16,12 +17,13 @@ export interface AppDeps {
   aiAvailable?: boolean;
   checkAiReady?: () => Promise<boolean>;
   aiProvider?: AiProvider | null;
+  getAiActivity?: () => AiActivity | null;
 }
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
   app.use(express.json());
-  app.use('/api', createRoutes(deps.config, deps.repo, deps.triggerFetch, deps.aiAvailable ?? false, deps.checkAiReady, deps.aiProvider ?? null));
+  app.use('/api', createRoutes(deps.config, deps.repo, deps.triggerFetch, deps.aiAvailable ?? false, deps.checkAiReady, deps.aiProvider ?? null, deps.getAiActivity ?? (() => null)));
 
   if (deps.staticDir && existsSync(deps.staticDir)) {
     app.use(express.static(deps.staticDir));
